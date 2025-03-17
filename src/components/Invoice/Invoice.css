@@ -88,7 +88,7 @@
 
 .category-bar {
   position: fixed;
-  top: 1.5rem;
+  top: 3.6rem;
   /* border: 3px solid var(--bg); */
   /* margin: 0 1rem; */
   max-width: 50%;
@@ -101,12 +101,14 @@
   border-radius: 0 0 1rem 1rem;
   box-shadow: 2px 2px 6px 2px var(--bg);
   border: none;
-  display: flex;
+  display: flex
+;
   flex-direction: column;
   height: 80ch;
   z-index: 1;
-  padding-top: 2rem;
+  /* padding-top: 2rem; */
   padding-bottom: 12rem;
+  border-radius: 0 1rem 1rem 0;
 }
 .category-bar button {
   margin: 0.5rem;
@@ -150,7 +152,7 @@
 
 .category-barr {
   width: 20%;
-  padding: 10px;
+  /* padding: 10px; */
   border-right: 1px solid #ddd;
 }
 
