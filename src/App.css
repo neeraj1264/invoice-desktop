@@ -1,5 +1,7 @@
 :root {
-  --bg: #ED6629;
+  /* --bg: #ED6629; */
+  --bg: #3b0101;
+  --text: #9b0000;
   --in: #2d3748;
   --out: #1a202c;
   --light: #edf2f7;
@@ -65,7 +67,7 @@ body{
 .lds-ripple {
     position: fixed;
     top: 44%;
-    left: 38%;
+    left: 46%;
     transform: translate(-50%, -50%);
     color: var(--bg);
 }

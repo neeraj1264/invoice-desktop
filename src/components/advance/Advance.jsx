@@ -71,14 +71,14 @@ const Advance = ({ orders, setOrders }) => {
       <div className="advance-page">
         {/* Advanced Features Checkbox */}
         <div className="checkbox-container">
-          <label>
+          {/* <label>
             <input
               type="checkbox"
               checked={advancedCheckboxState}
               onChange={handleAdvancedCheckboxClick} // Manage state directly here
             />
             <h4>Access Advanced Features</h4>
-          </label>
+          </label> */}
         </div>
 
         {/* Normal Features Checkbox */}

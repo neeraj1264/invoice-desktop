@@ -1,18 +1,22 @@
 // CustomerDetail.js
 import React, { useState, useEffect, useRef } from "react";
-import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { FaArrowLeft, FaArrowRight, FaCloudDownloadAlt } from "react-icons/fa";
+import { useLocation, useNavigate } from "react-router-dom";
 import { handleScreenshot } from "../Utils/DownloadPng"; // Import the function
 import "./Customer.css";
 // import { handleScreenshotAsPDF } from "../Utils/DownloadPdf";
 import Header from "../header/Header";
-import { sendorder, setdata, fetchcustomerdata } from "../../api";
+import { sendorder, setdata, fetchcustomerdata, fetchOrders } from "../../api";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { FaWhatsapp } from "react-icons/fa6";
+import { IoPrint } from "react-icons/io5";
+import { addItem, getAll, saveItems } from "../../DB";
+import PrintButton from "../Utils/PrintButton";
 
 const toastOptions = {
   position: "bottom-right",
-  autoClose: 2000,
+  autoClose: 5000,
   pauseOnHover: true,
   draggable: true,
   theme: "dark",
@@ -26,13 +30,23 @@ const CustomerDetail = () => {
   const [productsToSend, setproductsToSend] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [orders, setOrders] = useState([]);
-  const getdeliveryCharge = localStorage.getItem("deliveryCharge");
-  const deliveryChargeAmount = parseFloat(getdeliveryCharge) || 0;
+  const deliveryChargeAmount = parseFloat(deliveryCharge) || 0;
+
   // State to hold all saved customers for auto-fill
   const [savedCustomers, setSavedCustomers] = useState([]);
   // State to hold suggestions based on current phone input
   const [phoneSuggestions, setPhoneSuggestions] = useState([]);
 
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [discountPercent, setDiscountPercent] = useState("");
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateOrderInfo, setDuplicateOrderInfo] = useState(null); // in minutes
+  const [pendingOrder, setPendingOrder] = useState(null); // { order, customer }
+
+  const location = useLocation();
+  const { billNo, orderNo } = location.state || {};
+  const [billNumber, setbillNumber] = useState(billNo || "");
+  const [orderNumber, setorderNumber] = useState(orderNo || "");
   const invoiceRef = useRef(); // Reference to the hidden invoice content
   const navigate = useNavigate();
 
@@ -49,6 +63,26 @@ const CustomerDetail = () => {
   }, []);
 
   useEffect(() => {
+    // Use passed customer info if available
+    if (location.state?.customerInfo) {
+      const { name, phone, address } = location.state.customerInfo;
+      setCustomerName(name || "");
+      setCustomerPhone(phone || "");
+      setCustomerAddress(address || "");
+    }
+    // Otherwise load from localStorage
+    else {
+      const storedCustomerInfo =
+        JSON.parse(localStorage.getItem("customerInfo")) || {};
+      setCustomerName(storedCustomerInfo.name || "");
+      setCustomerPhone(storedCustomerInfo.phone || "");
+      setCustomerAddress(storedCustomerInfo.address || "");
+    }
+
+    // ... rest of your useEffect code
+  }, [location.state]);
+
+  useEffect(() => {
     // Fetch customer data from API (or use localStorage fallback)
     const fetchData = async () => {
       try {
@@ -57,8 +91,10 @@ const CustomerDetail = () => {
           ? response
           : response.data || [];
         setSavedCustomers(customersArray);
-      } catch (error) {
-        console.error("Error fetching customer data:", error.message);
+        // await saveItems('customers', customersArray);
+      } catch {
+        const offline = await getAll("customers");
+        setSavedCustomers(offline);
         const localStorageCustomers =
           JSON.parse(localStorage.getItem("customers")) || [];
         if (localStorageCustomers.length > 0) {
@@ -67,6 +103,15 @@ const CustomerDetail = () => {
       }
     };
     fetchData();
+  }, []);
+
+  // Load orders from IDB for history
+  useEffect(() => {
+    const load = async () => {
+      const offline = await getAll("orders");
+      setOrders(offline);
+    };
+    load();
   }, []);
 
   // Update suggestions based on current phone input (prefix match)
@@ -91,11 +136,34 @@ const CustomerDetail = () => {
     setPhoneSuggestions([]);
   };
 
-  const handleSendToWhatsApp = () => {
-    const restaurantName = "Urban Pizzeria";
+  // Helper function to calculate total price
+  const calculateTotalPrice = (products = []) => {
+    return products.reduce(
+      (total, product) => total + product.price * product.quantity,
+      0
+    );
+  };
 
-    const currentTotalAmount =
-      calculateTotalPrice(productsToSend) + deliveryChargeAmount;
+  const computeTotals = () => {
+    const base = calculateTotalPrice(productsToSend) + deliveryChargeAmount;
+
+    const amt = parseFloat(discountAmount) || 0;
+    const pct = parseFloat(discountPercent) || 0;
+
+    let disc = 0;
+    if (pct > 0) disc = (pct / 100) * base;
+    else if (amt > 0) disc = amt;
+    disc = Math.min(disc, base);
+
+    return { base, discountValue: disc, netTotal: base - disc };
+  };
+
+  const { discountValue, netTotal } = computeTotals();
+
+  const handleSendToWhatsApp = () => {
+    // Reuse your computeTotals logic so WhatsApp matches the printed invoice
+    const { base, discountValue, netTotal } = computeTotals();
+    // base is itemTotal + deliveryChargeAmount
 
     // Map product details into a formatted string
     const productDetails = productsToSend
@@ -110,22 +178,29 @@ const CustomerDetail = () => {
 
     // Check if deliveryCharge exists
     const serviceChargeText = deliveryCharge
-      ? `Service Charge: ₹${deliveryChargeAmount}` // No extra newline
+      ? `Service Charge +${deliveryChargeAmount}` // No extra newline
       : "";
 
     const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // Construct the WhatsApp message
-    const message = encodeURIComponent(
-      `*🍔🍟🍕 ${restaurantName} 🍕🍟🍔*\n\n` +
-        `Order: *${orderId}*` +
-        (customerPhone ? `\nPhone: *${customerPhone}*` : "") +
-        (customerName ? `\nName: *${customerName}*` : "") +
-        (customerAddress ? `\nAddress: *${customerAddress}*` : "") +
-        `\nAmount: *₹${currentTotalAmount}*` +
-        `\n\n----------item----------\n${productDetails}` + // No extra newline here
-        (serviceChargeText ? `\n${serviceChargeText}` : "") // Add only if serviceChargeText exists
-    );
+    // Build the WhatsApp message in the same order as the invoice
+    let msg = `Bill-No: *${billNumber}*\n`;
+    msg += `Order-No: *RT-${orderNumber}*\n`;
+    msg += `Order-Type: *${orderType}*\n`;
+    msg += `Amount: *${netTotal.toFixed(2)}*`;
+    if (customerPhone) msg += `\nPhone: *${customerPhone}*`;
+    if (customerName) msg += `\nName: *${customerName}*`;
+    if (customerAddress) msg += `\nAddress: *${customerAddress}*`;
+    msg += `\n\n----------ITEMS----------\n${productDetails}`;
+    // Totals block
+    if (serviceChargeText) {
+      msg += `\n\n${serviceChargeText}`;
+    }
+
+    if (discountValue > 0) {
+      msg += `\nDiscount  *–${discountValue.toFixed(2)}*`;
+    }
+    const message = encodeURIComponent(msg);
 
     const phoneNumber = customerPhone;
 
@@ -143,11 +218,31 @@ const CustomerDetail = () => {
     }
   };
 
-  const handleBack = () => {
-    navigate(-1);
-  };
+  function normalizeSignature(products) {
+    const items = products
+      .map((p) => ({
+        name: p.name,
+        size: p.size || "",
+        price: p.price,
+        quantity: p.quantity,
+      }))
+      .sort((a, b) => (a.name + a.size).localeCompare(b.name + b.size));
+    return JSON.stringify(items);
+  }
+
+  async function getAllOrders() {
+    if (navigator.onLine) {
+      // fetch from server
+      return await fetchOrders();
+    } else {
+      // fetch from IndexedDB
+      return await getAll("orders");
+    }
+  }
 
   const handleSendClick = async () => {
+    const { discountValue, netTotal } = computeTotals();
+
     const productsToSend = JSON.parse(localStorage.getItem("productsToSend"));
     if (!productsToSend || productsToSend.length === 0) {
       toast.error("Please add product before proceed", toastOptions);
@@ -160,19 +255,25 @@ const CustomerDetail = () => {
       localStorage.setItem("deliveryCharge", deliveryCharge);
     }
 
+    const now = new Date();
     const orderId = `order_${Date.now()}`;
 
     // Create an order object
     const order = {
       id: orderId,
+      orderNumber,
+      billNumber,
+      orderType,
       products: productsToSend,
-      totalAmount: calculateTotalPrice(productsToSend) + deliveryChargeAmount,
+      totalAmount: netTotal,
       name: customerName,
       phone: customerPhone,
       address: customerAddress,
+      delivery: deliveryCharge,
+      discount: discountAmount,
       timestamp: new Date().toISOString(),
     };
-
+    console.log("order created", order);
     const customerDataObject = {
       id: orderId,
       name: customerName,
@@ -181,50 +282,87 @@ const CustomerDetail = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // Get the current orders from localStorage
-    const savedOrders = JSON.parse(localStorage.getItem("orders")) || [];
-
-    // Add the new order to the list
-    savedOrders.push(order);
-
-    // Save the updated orders back to localStorage
-    localStorage.setItem("orders", JSON.stringify(savedOrders));
-
+    if (!navigator.onLine) {
+      // OFFLINE: just queue for later
+      await addItem("orders", order);
+      await addItem("customers", customerDataObject);
+      toast.info("You’re offline — order is saved locally ", toastOptions);
+      return;
+    }
+    // ✅ STEP 2: Now safe to fetch orders online
+    let allOrders = [];
     try {
-      // Send the order to your backend to be saved in MongoDB
-      const data = await sendorder(order);
-      console.log("Order created:", data);
-
-      // You can clear localStorage or perform any other actions as needed
-      // localStorage.removeItem("products"); // Example
-    } catch (error) {
-      console.error("Error sending order:", error.message);
+      allOrders = await getAllOrders();
+    } catch (err) {
+      console.warn("Failed to fetch orders. Assuming offline.");
+      await addItem("orders", order);
+      await addItem("customers", customerDataObject);
+      toast.info("You’re offline — order saved locally.");
+      return;
     }
 
-    try {
-      const customerDataResponse = await setdata(customerDataObject);
-      if (
-        customerDataResponse.message ===
-        "Customer already exists, no changes made."
-      ) {
-        console.log(
-          "Customer already exists in the database, no need to add again."
-        );
-      } else {
-        console.log("Customer Data Added", customerDataResponse);
+    // 3. check for any duplicate in the last hour, but also grab the matching order
+
+    const newSig = normalizeSignature(productsToSend);
+
+    let prevMatch = null;
+    const ONE_HOUR = 1000 * 60 * 60;
+
+    // find the first duplicate
+    for (let o of allOrders) {
+      if (!o.products) continue;
+      const sig = normalizeSignature(o.products);
+      if (sig === newSig) {
+        const prevTime = Date.parse(o.timestamp);
+        const diffMs = now.getTime() - prevTime;
+
+        if (diffMs > 0 && diffMs <= ONE_HOUR) {
+          prevMatch = { order: o, diffMs };
+          break;
+        }
       }
-    } catch (error) {
-      console.error("Error sending customer data:", error.message);
+    }
+
+    if (prevMatch) {
+      // compute minutes (rounded)
+      const minutesAgo = Math.round(prevMatch.diffMs / (1000 * 60));
+
+      setDuplicateOrderInfo(minutesAgo);
+      setPendingOrder({ order, customer: customerDataObject });
+      setShowDuplicateModal(true);
+      return;
+    }
+
+    console.log("order created", order);
+    // if (!navigator.onLine) {
+    //   // OFFLINE: just queue for later
+    //   await addItem("orders", order);
+    //   await addItem("customers", customerDataObject);
+    //   toast.info("You’re offline — order is saved locally ");
+    //   // setShowPopup(false);
+    //   // navigate("/invoice");
+    //   return;
+    // }
+
+    // ONLINE: send immediately
+    setShowPopup(true);
+    try {
+      await sendorder(order);
+      await setdata(customerDataObject);
+    } catch (err) {
+      await addItem("orders", order);
+      console.error("Error sending online order:", err);
+      toast.info("You’re offline — order is saved locally ");
     }
   };
 
   const handleClosePopup = () => {
     setShowPopup(false);
 
+    localStorage.removeItem("productsToSend");
+    localStorage.removeItem("customerInfo");
     // Navigate to the invoice page
     navigate("/invoice");
-
-    window.location.reload();
   };
 
   const handlePngDownload = () => {
@@ -256,8 +394,6 @@ const CustomerDetail = () => {
   const MobilePrint = async () => {
     try {
       // Convert both logo and QR code to Base64
-      const logoBase64 = await convertImageToBase64("/logo.png");
-      const qrBase64 = await convertImageToBase64("/qr.png");
 
       const kotContent = document.getElementById("mobileinvoice").innerHTML;
 
@@ -267,28 +403,29 @@ const CustomerDetail = () => {
           <head>
             <title>KOT</title>
             <style>
-              body {
+                body {
                 font-family: Arial, sans-serif;
                 font-size: 12px;
-                margin: 3rem 0;
-                padding: 0;
-                width: 48mm;
+                width: 69mm;
               }
               table {
-                width: 94%;
+                width: 100%;
                 border-collapse: collapse;
               }
               th, td {
-                border: 2px solid black;
+                border: 1px solid black;
                 padding: 2px;
                 text-align: left;
-                font-size: 10px;
-                font-weight: bold;
+                font-size: 11px;
+                color: "black";
               }
-              .total {
+                .total {
                 font-size: 13px;
                 text-align: left;
                 margin-top: 4px;
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
               }
               .totalAmount {
                 font-size: 15px;
@@ -301,7 +438,7 @@ const CustomerDetail = () => {
               }
               .logo {
                 display: flex;
-                margin: auto;
+                margin: 3px auto;
               }
               .logo img {
                 width: 40px;
@@ -330,14 +467,6 @@ const CustomerDetail = () => {
     }
   };
 
-  // Helper function to calculate total price
-  const calculateTotalPrice = (products = []) => {
-    return products.reduce(
-      (total, product) => total + product.price * product.quantity,
-      0
-    );
-  };
-
   // Handle customer phone input validation
   const handlePhoneChange = (e) => {
     const phoneValue = e.target.value;
@@ -348,130 +477,15 @@ const CustomerDetail = () => {
     }
   };
 
-  const handleRawBTPrint = () => {
-    const hasDeliveryCharge = getdeliverycharge !== 0; // Check if delivery charge exists
-
-    const orderWidth = 2;
-    const nameWidth = 16; // Set a fixed width for product name
-    const priceWidth = 4; // Set a fixed width for price
-    const quantityWidth = 2; // Set a fixed width for quantity
-
-    // Helper function to break a product name into multiple lines if needed
-    const breakProductName = (name, maxLength) => {
-      const lines = [];
-      while (name.length > maxLength) {
-        lines.push(name.substring(0, maxLength)); // Add a line of the name
-        name = name.substring(maxLength); // Remove the part that has been used
-      }
-      lines.push(name); // Add the last remaining part of the name
-      return lines;
-    };
-
-    // Map product details into a formatted string with borders
-    const productDetails = productsToSend
-      .map((product, index) => {
-        const orderNumber = `${index + 1}`.padStart(orderWidth, " "); // Format the order number
-        const productSize = product.size ? `(${product.size})` : "";
-
-        // Break the product name into multiple lines if it exceeds the fixed width
-        const nameLines = breakProductName(
-          product.name + " " + productSize,
-          nameWidth
-        );
-
-        // Format the price and quantity with proper padding
-        const paddedPrice = `${product.price}`.padStart(priceWidth, " "); // Pad price to the left
-        const paddedQuantity = `${product.quantity}`.padStart(
-          quantityWidth,
-          " "
-        ); // Pad quantity to the left
-
-        // Combine name lines with the proper padding for price and quantity
-        const productText = nameLines
-          .map((line, index) => {
-            if (index === 0) {
-              return `${orderNumber}. ${line.padEnd(
-                nameWidth,
-                " "
-              )} ${paddedQuantity} x ${paddedPrice} `;
-            } else {
-              return `    ${line.padEnd(nameWidth, " ")} ${"".padEnd(
-                priceWidth,
-                " "
-              )} ${"".padEnd(quantityWidth, " ")} `;
-            }
-          })
-          .join(""); // Join the product name lines with a newline
-
-        return productText;
-      })
-      .join("\n");
-
-    // Add a border for the header
-    const header = ` No    Item Name     Qty  price `;
-    const separator = `+${"-".repeat(nameWidth + 2)}+${"-".repeat(
-      priceWidth + 2
-    )}+${"-".repeat(quantityWidth + 2)}+`;
-    const dash = `--------------------------------`;
-    const totalprice = `${calculateTotalPrice(productsToSend)}`.padStart(
-      priceWidth,
-      " "
-    );
-    const delivery = `${getdeliverycharge}`.padStart(priceWidth, " ");
-    // Combine header, separator, and product details
-    const detailedItems = `\n${dash}\n${header}\n${dash}\n${productDetails}\n${dash}`;
-
-    const invoiceText = `
-  \x1B\x61\x01  Pehowa, Haryana, 136128\x1B\x61\x00
-  \x1B\x61\x01  Phone: +91 81689-01827\x1B\x61\x00
-
-  \x1B\x61\x01Lal Dawara Mandir Wali Gali,\x0ANear Body Fine Gym Ambala \x0A   Road Pehowa.\x1B\x61\x00
-
-  \x1B\x21\x10-----Invoice Details-----\x1B\x21\x00
-  
-  Bill No: #${Math.floor(1000 + Math.random() * 9000)}
-  Date: ${
-    new Date().toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }) +
-    " " +
-    new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true, // Enables 12-hour format
-    })
-  }
-  Customer: ${customerName || "Guest Customer"}
-  Phone: ${customerPhone || "N/A"}
-  Address: ${customerAddress || "N/A"}  
-  ${detailedItems}
-  ${hasDeliveryCharge ? `           Item Total:  ${totalprice} ` : " "}
-  ${hasDeliveryCharge ? `       Service Charge:  ${delivery}\n${dash}` : " "}
-\x1B\x21\x30\x1B\x34Total: Rs ${
-      calculateTotalPrice(productsToSend) + getdeliverycharge
-    }/-\x1B\x21\x00\x1B\x35
-
-    Thank You Visit Again!
-  ---------------------------
-  
-       Powered by BillZo
-       
-  `;
-
-    // Send the content to RawBT (add more parameters if required)
-    const encodedText = encodeURIComponent(invoiceText);
-    const rawBTUrl = `intent:${encodedText}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-
-    // Trigger RawBT
-    window.location.href = rawBTUrl;
-  };
-
   const getdeliverycharge = localStorage.getItem("deliveryCharge")
     ? parseFloat(localStorage.getItem("deliveryCharge"))
     : 0; // Default to 0 if not set
+
+  const [logoAvailable, setLogoAvailable] = useState(true);
+  const [qrAvailable, setQrAvailable] = useState(true);
+
+  const orderType = localStorage.getItem("orderType");
+
   return (
     <div>
       <ToastContainer />
@@ -542,6 +556,50 @@ const CustomerDetail = () => {
           placeholder="Delivery charge..."
         />
       </div>
+
+      <div className="cust-inputs">
+        <input
+          type="number"
+          value={discountAmount}
+          onChange={(e) => {
+            setDiscountAmount(e.target.value);
+            setDiscountPercent(""); // clear percent if you start typing an amount
+          }}
+          placeholder="Discount (₹ amount)"
+        />
+      </div>
+      {/* <div className="cust-inputs">
+        <select
+          value={discountPercent}
+          onChange={(e) => {
+            setDiscountPercent(e.target.value);
+            setDiscountAmount("");
+          }}
+        >
+          <option value="">Discount (%)</option>
+          <option value="5">5%</option>
+          <option value="10">10%</option>
+          <option value="15">15%</option>
+          <option value="20">20%</option>
+          <option value="25">25%</option>
+          <option value="30">30%</option>
+          <option value="35">35%</option>
+          <option value="40">40%</option>
+          <option value="45">45%</option>
+          <option value="50">50%</option>
+          <option value="55">55%</option>
+          <option value="60">60%</option>
+          <option value="65">65%</option>
+          <option value="70">70%</option>
+          <option value="75">75%</option>
+          <option value="80">80%</option>
+          <option value="85">85%</option>
+          <option value="90">90%</option>
+          <option value="95">95%</option>
+          <option value="100">100%</option>
+        </select>
+      </div> */}
+
       {/* mobile print content */}
       <div
         className="invoice-content"
@@ -549,98 +607,128 @@ const CustomerDetail = () => {
         ref={invoiceRef}
         style={{ display: "none" }}
       >
-        <img src="/logo.png" alt="Logo" width={150} className="logo" />
-        {/* <h1 style={{ textAlign: "center", margin: 0, fontSize: "25px" }}>
-          Urban Pizzeria
-        </h1> */}
-        <p
+        <div
           style={{
-            textAlign: "center",
-            margin: 0,
-            fontSize: "14px",
-            padding: "0 2px",
+            border: "2px dotted",
+            margin: "0 0 5px 0",
+            padding: ".4rem",
           }}
         >
-          Lal Dawara Mandir Wali Gali, Near Body Fine Gym Ambala Road Pehowa.
-        </p>
-        <p style={{ textAlign: "center", margin: 0, fontSize: "14px" }}>
-          +91 81689-01827
-        </p>
-        <hr />
-        <h2 style={{ textAlign: "center", margin: 0, fontSize: "20px" }}>
-          Invoice Details
-        </h2>
-        <div className="customer-info">
-          <p style={{ fontSize: "12px", margin: "0" }}>
-            Bill No:&nbsp;&nbsp;
-            {`#${Math.floor(1000 + Math.random() * 9000)}`}{" "}
-            {/* Random 6-digit bill number */}
+          {logoAvailable && (
+            <img
+              src="/logo.png"
+              alt="Logo5"
+              width={150}
+              className="logo"
+              onError={() => setLogoAvailable(false)}
+            />
+          )}
+          <h1
+            style={{ textAlign: "center", margin: ".5rem", fontSize: "25px" }}
+          >
+            Chicago Delight's
+          </h1>
+          <p
+            style={{
+              textAlign: "center",
+              marginTop: 0,
+              fontSize: "15px",
+              padding: "0 2px",
+            }}
+          >
+            Opposite Swaraj Agency Kurukshetra,
+            <br />
+            Road Pehowa(136-128),
+            <br />
+            98966-42812 90340-62812
           </p>
-          <p style={{ fontSize: "12px", margin: "0" }}>
-            Date:&nbsp;&nbsp;&nbsp;&nbsp;
-            {new Date().toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }) +
-              " " +
-              new Date().toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: true, // Enables 12-hour format
-              })}
-          </p>
+          <hr />
+          <h2 style={{ textAlign: "center", margin: 0, fontSize: "20px" }}>
+            Invoice Details
+          </h2>
+          <div className="customer-info">
+            <p style={{ fontSize: "16px", margin: "0" }}>
+              Order No:&nbsp;&nbsp;{" "}
+              <span style={{ fontWeight: "bold" }}>RT-{orderNumber}</span>
+            </p>
+            <p style={{ fontSize: "16px", margin: "0" }}>
+              Bill No:&nbsp;&nbsp;{" "}
+              <span style={{ fontWeight: "bold" }}>#{billNumber}</span>
+            </p>
+            <p style={{ fontSize: "16px", margin: "0" }}>
+              OrderType&nbsp;:&nbsp;&nbsp;{" "}
+              <span style={{ fontWeight: "bold" }}>{orderType}</span>
+            </p>
+            <p style={{ fontSize: "16px", margin: "0" }}>
+              Date:&nbsp;&nbsp;&nbsp;&nbsp;
+              {new Date().toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }) +
+                " " +
+                new Date().toLocaleTimeString("en-GB", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: true, // Enables 12-hour format
+                })}
+            </p>
 
-          {customerName && (
-            <p style={{ fontSize: "12px", margin: "0" }}>
-              Customer:&nbsp;{customerName}
-            </p>
-          )}
-          {customerPhone && (
-            <p style={{ fontSize: "12px", margin: "0" }}>
-              Phone:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{customerPhone}
-            </p>
-          )}
-          {customerAddress && (
-            <p style={{ fontSize: "12px", margin: "0 0 1rem 0" }}>
-              Address:&nbsp;&nbsp;&nbsp;&nbsp;{customerAddress}
-            </p>
-          )}
-        </div>
-        <table>
-          <thead>
-            <tr className="productname">
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Price</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {productsToSend.map((product, index) => (
-              <tr key={index} className="productdetail">
-                <td>
-                  {product.size
-                    ? `${product.name} (${product.size})`
-                    : product.name}
-                </td>
-                <td style={{ textAlign: "Center" }}>{product.quantity || 1}</td>
-                <td style={{ textAlign: "Center" }}>₹{product.price}</td>
-                <td style={{ textAlign: "Center" }}>
-                  ₹{product.price * (product.quantity || 1)}
-                </td>
+            {customerName && (
+              <p style={{ fontSize: "16px", margin: "0" }}>
+                Customer&nbsp;:&nbsp;{customerName}
+              </p>
+            )}
+            {customerPhone && (
+              <p style={{ fontSize: "16px", margin: "0" }}>
+                Phone&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                {customerPhone}
+              </p>
+            )}
+            {customerAddress && (
+              <p style={{ fontSize: "16px", margin: "0 0 1rem 0" }}>
+                Address&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp;{customerAddress}
+              </p>
+            )}
+          </div>
+          <table>
+            <thead>
+              <tr style={{ background: "darkgrey" }}>
+                <th style={{ fontSize: "16px" }}>Item</th>
+                <th style={{ fontSize: "16px" }}>Qty</th>
+                <th style={{ fontSize: "16px" }}>Price</th>
+                <th style={{ fontSize: "16px" }}>Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {getdeliverycharge !== 0 && (
-          <>
-            <div className="total">
-              <p style={{ margin: "1rem 0 0 0" }}>
-                Item Total{" "}
-                <span>
-                  ₹{" "}
+            </thead>
+            <tbody>
+              {productsToSend.map((product, index) => (
+                <tr key={index} className="productdetail">
+                  <td style={{ fontSize: "15px" }}>
+                    {product.size
+                      ? `${product.name} (${product.size})`
+                      : product.name}
+                  </td>
+                  <td style={{ textAlign: "Center", fontSize: "15px" }}>
+                    {product.quantity || 1}
+                  </td>
+                  <td style={{ textAlign: "Center", fontSize: "15px" }}>
+                    ₹{product.price}
+                  </td>
+                  <td style={{ textAlign: "Center", fontSize: "15px" }}>
+                    ₹{product.price * (product.quantity || 1)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {getdeliverycharge !== 0 && (
+            <>
+              <div className="total">
+                <p style={{ margin: "1rem 0 0 0" }}>Item Total </p>
+
+                <p style={{ margin: "0" }}>
+                  ₹
                   {productsToSend
                     .reduce(
                       (sum, product) =>
@@ -648,55 +736,39 @@ const CustomerDetail = () => {
                       0
                     )
                     .toFixed(2)}
-                </span>
-              </p>
-            </div>
+                </p>
+              </div>
+              <div className="total">
+                <p style={{ margin: "0" }}>Service Charge:</p>
+                <p style={{ margin: "0" }}>+{getdeliverycharge.toFixed(2)}</p>
+              </div>
+            </>
+          )}
+          {(discountAmount > 0 || discountPercent > 0) && (
             <div className="total">
-              <p style={{ margin: "0" }}>
-                Service Charge: <span>₹{getdeliverycharge.toFixed(2)}</span>
+              <p style={{ margin: 0 }}>
+                Discount: {discountPercent > 0 && ` (${discountPercent}%)`}
               </p>
+              <p style={{ margin: "0" }}>–{discountValue.toFixed(2)}</p>
             </div>
-          </>
-        )}
-        <p className="totalAmount">
-          Net Total: ₹
-          {(
-            productsToSend.reduce(
-              (sum, product) => sum + product.price * (product.quantity || 1),
-              0
-            ) + getdeliverycharge
-          ).toFixed(2)}
-        </p>{" "}
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: "15px",
-            paddingBottom: "2rem",
-          }}
-        >
-          Thank You Visit Again!
+          )}
+          <p className="totalAmount">Net Total: ₹{netTotal.toFixed(2)}</p>{" "}
+          <hr />
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: "15px",
+              padding: ".1rem 0 1rem",
+            }}
+          >
+            Thank You Visit Again!
+          </div>
         </div>
-        <hr />
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: "bold",
-            fontSize: "1rem",
-          }}
-        >
-          {" "}
-          Order Online
-        </div>
-        <img
-          src="/qr.png"
-          alt="QR Code"
-          style={{ display: "flex", margin: "2px auto" }}
-        />
       </div>
       <div className="invoice-btn">
         <button
           onClick={() => {
-            navigate("/invoice");
+            navigate("/invoice", { state: { from: "customer-detail" } });
           }}
           className="invoice-kot-btn"
         >
@@ -712,23 +784,61 @@ const CustomerDetail = () => {
       {showPopup && (
         <div style={styles.popupOverlay}>
           <div style={styles.popupContent}>
-            <h2>Select Action</h2>
+            <h2> Action</h2>
             <button onClick={handleSendToWhatsApp} style={styles.popupButton}>
-              Send to WhatsApp
+              <FaWhatsapp style={{ fontSize: "1.5rem" }} />{" "}
+              <span style={{ marginLeft: "1rem" }}>WhatsApp</span>
             </button>
             <button onClick={handlePngDownload} style={styles.popupButton}>
-              Download Invoice
+              <FaCloudDownloadAlt style={{ fontSize: "1.5rem" }} />
+              <span style={{ marginLeft: "1rem" }}>Download</span>
             </button>
-            <button onClick={handleRawBTPrint} style={styles.popupButton}>
-              Mobile Print
-            </button>
-            <button onClick={MobilePrint} style={styles.popupButton}>
-              Usb Print
-            </button>
+<PrintButton elementId="mobileinvoice" label="Print" className="invoice-print-btn" />
 
             <button onClick={handleClosePopup} style={styles.popupCloseButton}>
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2) Duplicate‑order modal (on top of everything) */}
+      {showDuplicateModal && (
+        <div className="duplicate-modal-overlay">
+          <div className="duplicate-modal-content">
+            <h2>Duplicate Order Detected</h2>
+            <p>
+              This exact order was placed <strong>{duplicateOrderInfo}</strong>{" "}
+              minute
+              {duplicateOrderInfo === 1 ? "" : "s"} ago.
+            </p>
+            <p>Do you still want to save it again?</p>
+            <div className="duplicate-modal-buttons">
+              <button
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                  setPendingOrder(null);
+                }}
+              >
+                Print Only
+              </button>
+              <button
+                onClick={async () => {
+                  setShowDuplicateModal(false);
+                  if (pendingOrder) {
+                    try {
+                      await sendorder(pendingOrder.order);
+                      await setdata(pendingOrder.customer);
+                    } catch {
+                      await addItem("orders", pendingOrder.order);
+                      toast.info("System Offline! order will Saved offline");
+                    }
+                  }
+                }}
+              >
+                Print & Save
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -743,10 +853,12 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backdropFilter: "blur(4px)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 2000, // ✅ Added here
   },
   popupContent: {
     backgroundColor: "#fff",
@@ -755,7 +867,7 @@ const styles = {
     textAlign: "center",
   },
   popupButton: {
-    display: "block",
+    display: "flex",
     width: "100%",
     margin: "10px 0",
     padding: "10px",
