@@ -17,6 +17,8 @@ const History = () => {
   const [showRemoveBtn, setShowRemoveBtn] = useState(false);
   const navigate = useNavigate();
   const [syncing, setSyncing] = useState(false);
+  const [totalCash, setTotalCash] = useState(0);
+  const [totalUpi, setTotalUpi] = useState(0);
 
   // Show remove button on long press
   let pressTimer;
@@ -79,7 +81,6 @@ const History = () => {
       setLoading(true); // Start loading
       try {
         const data = await fetchOrders(); // Call the API function
-
         setOrders(data);
         // await saveItems("orders", data);
 
@@ -89,6 +90,18 @@ const History = () => {
 
         // Calculate grand total for the day
         setGrandTotal(dayOrders.reduce((sum, o) => sum + o.totalAmount, 0));
+        // Calculate payment totals
+        const cashTotal = dayOrders.reduce(
+          (sum, o) => sum + (o.cashAmount || 0),
+          0
+        );
+        const upiTotal = dayOrders.reduce(
+          (sum, o) => sum + (o.upiAmount || 0),
+          0
+        );
+
+        setTotalCash(cashTotal);
+        setTotalUpi(upiTotal);
       } catch {
         const offline = await getAll("orders");
         setOrders(offline);
@@ -277,119 +290,196 @@ const History = () => {
                   ))}
                 </select>
               </h2>
+              <div className="payment-totals">
+                <div className="cash-box">
+                  <h3>
+                    Cash:
+                    <span>₹{totalCash}</span>
+                  </h3>
+                </div>
+                <div className="upi-box">
+                  <h3>
+                    Upi:
+                    <span>₹{totalUpi}</span>
+                  </h3>
+                </div>
+              </div>
             </div>
 
             {filteredOrders.length > 0 ? (
               [...filteredOrders].reverse().map((order, index) => (
-             <div
-  key={order.id}
-  className="order-section"
-  onMouseDown={handlePressStart}
-  onMouseUp={handlePressEnd}
-  onTouchStart={handlePressStart}
-  onTouchEnd={handlePressEnd}
->
-  <hr />
+                <div
+                  key={order.id}
+                  className="order-section"
+                  onMouseDown={handlePressStart}
+                  onMouseUp={handlePressEnd}
+                  onTouchStart={handlePressStart}
+                  onTouchEnd={handlePressEnd}
+                >
+                  <hr />
 
-  {/* CLICK TO EXPAND AREA */}
-  <div className="order-card" onClick={() => toggleOrder(order.id)}>
-    {/* Row 1 */}
-    <div className="order-row">
-      <strong>Order {filteredOrders.length - index}</strong>
-      <span className="badge bill-badge">Bill.no #{order.billNumber}</span>
-      <span className="badge order-badge">Order.id RT_{order.orderNumber}</span>
-      <span className="order-date">{formatDate(order.timestamp)}</span>
-    </div>
+                  {/* CLICK TO EXPAND AREA */}
+                  <div
+                    className="order-card"
+                    onClick={() => toggleOrder(order.id)}
+                  >
+                    {/* Row 1 */}
+                    <div className="order-row">
+                      <strong>Order {filteredOrders.length - index}</strong>
+                      <span className="badge bill-badge">
+                        Bill.no #{order.billNumber}
+                      </span>
+                      <span className="badge order-badge">
+                        Order.id RT_{order.orderNumber}
+                      </span>
+                      <span className="order-date">
+                        {formatDate(order.timestamp)}
+                      </span>
+                    </div>
 
-    {/* Row 2 */}
-    <div className="order-row">
-      <strong>Amount Received: ₹{order.totalAmount}</strong>
-      {order.phone && (
-        <FaWhatsapp
-          className="whatsapp"
-          onClick={(e) => {
-            e.stopPropagation(); // ✅ prevent triggering expand
-            handleWhatsappClick(order);
-          }}
-        />
-      )}
-    </div>
-  </div>
+                    {/* Row 2 */}
+                    <div className="order-row">
+                      <strong>Amount Received: ₹{order.totalAmount}</strong>
+                      {order.phone && (
+                        <FaWhatsapp
+                          className="whatsapp"
+                          onClick={(e) => {
+                            e.stopPropagation(); // ✅ prevent triggering expand
+                            handleWhatsappClick(order);
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
 
+                  {/* EXPANDED SECTION */}
+                  {expandedOrderId === order.id && (
+                    <>
+                      {(order.name || order.phone || order.address) && (
+                        <div
+                          className="customer-details"
+                          style={{ fontSize: "0.9rem", color: "#444" }}
+                        >
+                          {order.name && (
+                            <p>
+                              <strong>Customer:</strong> {order.name}
+                            </p>
+                          )}
+                          {order.phone && (
+                            <p>
+                              <strong>Phone:</strong> {order.phone}
+                            </p>
+                          )}
+                          {order.address && (
+                            <p>
+                              <strong>Address:</strong> {order.address}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
-  {/* EXPANDED SECTION */}
-  {expandedOrderId === order.id && (
-    <>
-      {(order.name || order.phone || order.address) && (
-        <div className="customer-details" style={{ fontSize: "0.9rem", color: "#444" }}>
-          {order.name && <p><strong>Customer:</strong> {order.name}</p>}
-          {order.phone && <p><strong>Phone:</strong> {order.phone}</p>}
-          {order.address && <p><strong>Address:</strong> {order.address}</p>}
-        </div>
-      )}
+                      <table className="products-table">
+                        <thead>
+                          <tr>
+                            <th>No.</th>
+                            <th>Items</th>
+                            <th>Price</th>
+                            <th>Qty</th>
+                            <th>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {order.products.map((product, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}.</td>
+                              <td>
+                                {product.size
+                                  ? `${product.name} (${product.size})`
+                                  : product.name}
+                              </td>
+                              <td>{product.price}</td>
+                              <td>{product.quantity}</td>
+                              <td>{product.price * product.quantity}</td>
+                            </tr>
+                          ))}
 
-      <table className="products-table">
-        <thead>
-          <tr>
-            <th>No.</th>
-            <th>Items</th>
-            <th>Price</th>
-            <th>Qty</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.products.map((product, idx) => (
-            <tr key={idx}>
-              <td>{idx + 1}.</td>
-              <td>
-                {product.size
-                  ? `${product.name} (${product.size})`
-                  : product.name}
-              </td>
-              <td>{product.price}</td>
-              <td>{product.quantity}</td>
-              <td>{product.price * product.quantity}</td>
-            </tr>
-          ))}
+                          {/* DELIVERY ROW */}
+                          {order.delivery > 0 && (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: "right" }}>
+                                <strong>Delivery Charge:</strong>
+                              </td>
+                              <td style={{ textAlign: "right" }}>
+                                <strong>+{order.delivery}</strong>
+                              </td>
+                            </tr>
+                          )}
 
-          {/* DELIVERY ROW */}
-          {order.delivery > 0 && (
-            <tr>
-              <td colSpan={4} style={{ textAlign: "right" }}>
-                <strong>Delivery Charge:</strong>
-              </td>
-              <td style={{ textAlign: "right" }}>
-                <strong>+{order.delivery}</strong>
-              </td>
-            </tr>
-          )}
+                          {/* DISCOUNT ROW */}
+                          {order.discount > 0 && (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: "right" }}>
+                                <strong>Discount:</strong>
+                              </td>
+                              <td style={{ textAlign: "right" }}>
+                                <strong>-{order.discount}</strong>
+                              </td>
+                            </tr>
+                          )}
 
-          {/* DISCOUNT ROW */}
-          {order.discount > 0 && (
-            <tr>
-              <td colSpan={4} style={{ textAlign: "right" }}>
-                <strong>Discount:</strong>
-              </td>
-              <td style={{ textAlign: "right" }}>
-                <strong>-{order.discount}</strong>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+                          {(order.cashAmount || order.upiAmount) && (
+                            <>
+                              {order.cashAmount > 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={4}
+                                    style={{ textAlign: "right" }}
+                                  >
+                                    <strong>Cash Paid:</strong>
+                                  </td>
+                                  <td style={{ textAlign: "right" }}>
+                                    <strong>
+                                      ₹{Number(order.cashAmount).toFixed(2)}
+                                    </strong>
+                                  </td>
+                                </tr>
+                              )}
+                              {order.upiAmount > 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={4}
+                                    style={{ textAlign: "right" }}
+                                  >
+                                    <strong>UPI Paid:</strong>
+                                  </td>
+                                  <td style={{ textAlign: "right" }}>
+                                    <strong>
+                                      ₹{Number(order.upiAmount).toFixed(2)}
+                                    </strong>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          )}
+                        </tbody>
+                      </table>
 
-      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-        <PrintButton
-          order={order}
-          label="Print Invoice"
-          className="history-print-btn"
-        />
-      </div>
-    </>
-  )}
-</div>
-
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          marginTop: "8px",
+                        }}
+                      >
+                        <PrintButton
+                          order={order}
+                          label="Print Invoice"
+                          className="history-print-btn"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               ))
             ) : (
               <p>No orders found for {filter.toLowerCase()}.</p>

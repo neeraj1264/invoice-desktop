@@ -45,21 +45,66 @@ const toastOptions = {
   width: "90%",
 };
 const BOGO_ELIGIBLE_PRODUCTS = {
-  "Farm fresh pizza ":      { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Delight pizza ":         { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Country spl pizza ":     { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Achari pizza ":          { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Makhni paneer pizza ":   { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Tandoori paneer pizza ": { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Kurkura pizza ":         { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Mix veg pizza ":         { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Veggie deluxe pizza " :  { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Spicy chilly pizza ":    { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Maxican green wave ":    { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Urban spl pizza ":       { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Pasta pizza ":           { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Veggie spl. pizza ":     { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
-  "Pappy paneer pizza ":    { paid: ["med", "large"], free: { med: "Reg", large: "med" } },
+  "Farm fresh pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Delight pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Country spl pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Achari pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Makhni paneer pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Tandoori paneer pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Kurkura pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Mix veg pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Veggie deluxe pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Spicy chilly pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Maxican green wave ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Urban spl pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Pasta pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Veggie spl. pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
+  "Pappy paneer pizza ": {
+    paid: ["med", "large"],
+    free: { med: "Reg", large: "med" },
+  },
 };
 
 const Invoice = () => {
@@ -81,6 +126,10 @@ const Invoice = () => {
   // Add new state variables
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [cashAmount, setCashAmount] = useState("");
+  const [upiAmount, setUpiAmount] = useState("");
+
   const invoiceRef = useRef();
   const [customerInfo, setCustomerInfo] = useState(() => {
     try {
@@ -424,6 +473,22 @@ const Invoice = () => {
     setPhoneSuggestions(matches);
   }, [customerInfo.phone, savedCustomers]);
 
+  // Add useEffect to calculate the difference when one amount is entered
+  useEffect(() => {
+    if (paymentMethod === "partial") {
+      const total = calculateTotalPrice(productsToSend);
+      const cash = parseFloat(cashAmount) || 0;
+      // If cashAmount is an empty string we consider cash = 0 but keep cash input empty so placeholder shows
+      const remaining = Math.max(0, total - cash);
+      // store upi as a formatted string (two decimals) so UI shows consistent numbers
+      setUpiAmount(remaining.toFixed(2));
+    } else {
+      // clear when not partial
+      setCashAmount("");
+      setUpiAmount("");
+    }
+  }, [cashAmount, paymentMethod, productsToSend]);
+
   const handleSuggestionClick = (cust) => {
     setCustomerInfo({
       name: cust.name || "",
@@ -489,11 +554,11 @@ const Invoice = () => {
       ? selectedVarieties[0].size.toLowerCase()
       : product.size?.toLowerCase();
 
- // 1) Is this pizza even BOGO-eligible?
-  const pizzaInfo = BOGO_ELIGIBLE_PRODUCTS[product.name];
-  const eligibleSizes = pizzaInfo ? pizzaInfo.paid : [];
-  
-  const alreadyDone = bogoDone.has(product.name + pickedSize);
+    // 1) Is this pizza even BOGO-eligible?
+    const pizzaInfo = BOGO_ELIGIBLE_PRODUCTS[product.name];
+    const eligibleSizes = pizzaInfo ? pizzaInfo.paid : [];
+
+    const alreadyDone = bogoDone.has(product.name + pickedSize);
 
     if (bogoEnabled && eligibleSizes.includes(pickedSize) && !alreadyDone) {
       setBogoPaidProduct({ ...product, size: pickedSize });
@@ -545,7 +610,10 @@ const Invoice = () => {
                 isFree: true,
                 quantity: 1,
               });
-              setBogoPaidProduct({ ...product, size: product.size?.toLowerCase() });
+              setBogoPaidProduct({
+                ...product,
+                size: product.size?.toLowerCase(),
+              });
               // open our picker UI instead of adding immediately
               setBogoPickerOpen(true);
             }
@@ -594,7 +662,12 @@ const Invoice = () => {
           }
         });
       }
-console.log('BOGO pick:', product.name, pickedSize, BOGO_ELIGIBLE_PRODUCTS[product.name]);
+      console.log(
+        "BOGO pick:",
+        product.name,
+        pickedSize,
+        BOGO_ELIGIBLE_PRODUCTS[product.name]
+      );
 
       localStorage.setItem("productsToSend", JSON.stringify(updated));
       return updated;
@@ -699,6 +772,11 @@ console.log('BOGO pick:', product.name, pickedSize, BOGO_ELIGIBLE_PRODUCTS[produ
       const empty = { name: "", phone: "", address: "" };
       setCustomerInfo(empty);
       localStorage.removeItem("customerInfo");
+
+      // NEW: reset payment inputs for a fresh customer modal
+      setPaymentMethod("");
+      setCashAmount("");
+      setUpiAmount("");
     }
     // show customer modal
     setShowCustomerModal(true);
@@ -706,6 +784,28 @@ console.log('BOGO pick:', product.name, pickedSize, BOGO_ELIGIBLE_PRODUCTS[produ
 
   const handleCustomerSubmit = async () => {
     setIsSaving(true);
+
+    // Validate payment method is selected
+    if (!paymentMethod) {
+      toast.error("Please select a payment method", toastOptions);
+      setIsSaving(false);
+      return;
+    }
+
+    const total = calculateTotalPrice(productsToSend);
+
+    // Validate partial amounts
+    if (paymentMethod === "partial") {
+      const cash = parseFloat(cashAmount) || 0;
+      const upi = parseFloat(upiAmount) || 0;
+
+      // exact match check (allow small floating error)
+      if (Math.abs(cash + upi - total) > 0.001) {
+        toast.error("Partial amounts must add up to the total", toastOptions);
+        setIsSaving(false);
+        return;
+      }
+    }
 
     try {
       const todayKey = new Date().toLocaleDateString();
@@ -744,12 +844,26 @@ console.log('BOGO pick:', product.name, pickedSize, BOGO_ELIGIBLE_PRODUCTS[produ
         billNumber: billNo,
         orderType,
         products: productsToSend,
-        totalAmount: calculateTotalPrice(productsToSend),
+        totalAmount: total,
         name: customerInfo.name,
         phone: customerInfo.phone,
         address: customerInfo.address,
         timestamp: new Date().toISOString(),
+        paymentMethod,
+        cashAmount:
+          paymentMethod === "cash"
+            ? total
+            : paymentMethod === "partial"
+            ? parseFloat(cashAmount) || 0
+            : 0,
+        upiAmount:
+          paymentMethod === "upi"
+            ? total
+            : paymentMethod === "partial"
+            ? parseFloat(upiAmount) || 0
+            : 0,
       };
+
       const customerData = {
         id: orderId,
         name: customerInfo.name,
@@ -813,6 +927,12 @@ console.log('BOGO pick:', product.name, pickedSize, BOGO_ELIGIBLE_PRODUCTS[produ
       // Clear current productsToSend
       setProductsToSend([]);
       localStorage.removeItem("productsToSend");
+
+      // reset payment fields so next open is empty
+      setPaymentMethod("");
+      setCashAmount("");
+      setUpiAmount("");
+
       setShowCustomerModal(false);
       setPhoneSuggestions([]);
       const printArea = document.getElementById("sample-section");
@@ -877,6 +997,30 @@ display: none !important;
     } finally {
       setIsSaving(false); // End loading Regardless of success/error
     }
+  };
+
+  // CASH input handler: allow empty string, numeric values; if greater than total show toast and cap to total
+  const handleCashChange = (e) => {
+    const value = e.target.value;
+    // allow empty
+    if (value === "") {
+      setCashAmount("");
+      return;
+    }
+
+    // allow only numeric/decimal input
+    if (!/^\d*\.?\d*$/.test(value)) return;
+
+    const num = parseFloat(value);
+    const total = calculateTotalPrice(productsToSend);
+    if (!isNaN(num) && num > total) {
+      toast.error("Cash cannot be greater than total", toastOptions);
+      // cap to total (keeps user flow smooth and avoids invalid state)
+      setCashAmount(total.toFixed(2));
+      return;
+    }
+
+    setCashAmount(value);
   };
 
   const handleCreateInvoice = (orderItems, type) => {
@@ -952,7 +1096,6 @@ display: none !important;
     setShowKotModal(false);
   };
 
-  
   const TOP_CATEGORIES = [
     "pizza",
     "Pizza Double topping",
@@ -973,7 +1116,6 @@ display: none !important;
     "Sides",
     "Snacks",
     "Sweetcorn",
-
   ];
 
   const sortByTopCategories = (list) => {
@@ -996,7 +1138,6 @@ display: none !important;
   const categoriess = useMemo(() => {
     return sortByTopCategories(Object.keys(filteredProducts));
   }, [filteredProducts]);
-
 
   return (
     <div>
@@ -1261,82 +1402,82 @@ display: none !important;
                   <hr className="hr" />
                   {productsToSend.map((product, index) => (
                     <>
-                    <li
-                      key={index}
-                      className="product-item"
-                      style={{ display: "flex" }}
-                    >
-                      <div
-                        style={{
-                          width: "10%",
-                        }}
+                      <li
+                        key={index}
+                        className="product-item"
+                        style={{ display: "flex" }}
                       >
-                        <span className="s-s-t-1">{index + 1}.</span>
-                      </div>
-                      <div style={{ width: "50%" }}>
-                        <span>
-                          {product.name}
-                          {product.size ? ` (${product.size})` : ""}
-                          {/* Add FREE label here if it's a free item */}
-                          {product.isFree && (
-                            <span className="free-label"> (FREE)</span>
-                          )}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          width: "25%",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div className="quantity-btn">
-                          <button
-                            className="icon"
-                            onClick={() =>
-                              handleQuantityChange(
-                                product.name,
-                                product.price,
-                                -1
-                              )
-                            }
-                            // disabled={product.quantity <= 1}
-                          >
-                            <FaMinusCircle />
-                          </button>
-                          <span>{product.quantity}</span>
-                          <button
-                            className="icon"
-                            onClick={() =>
-                              handleQuantityChange(
-                                product.name,
-                                product.price,
-                                1
-                              )
-                            }
-                          >
-                            <FaPlusCircle />
-                          </button>
+                        <div
+                          style={{
+                            width: "10%",
+                          }}
+                        >
+                          <span className="s-s-t-1">{index + 1}.</span>
                         </div>
-                      </div>{" "}
-                      <div
-                        style={{
-                          width: "15%",
-                          textAlign: "right",
-                          paddingRight: "10px",
-                        }}
-                      >
-                        <div>
-                          {product.isFreeBogo ? (
-                            <span className="s-s-t-4">FREE</span>
-                          ) : (
-                            <span className="s-s-t-4">
-                              {product.price * product.quantity}
-                            </span>
-                          )}
+                        <div style={{ width: "50%" }}>
+                          <span>
+                            {product.name}
+                            {product.size ? ` (${product.size})` : ""}
+                            {/* Add FREE label here if it's a free item */}
+                            {product.isFree && (
+                              <span className="free-label"> (FREE)</span>
+                            )}
+                          </span>
                         </div>
-                      </div>
-                    </li>
-                    <hr className="hr" />
+                        <div
+                          style={{
+                            width: "25%",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div className="quantity-btn">
+                            <button
+                              className="icon"
+                              onClick={() =>
+                                handleQuantityChange(
+                                  product.name,
+                                  product.price,
+                                  -1
+                                )
+                              }
+                              // disabled={product.quantity <= 1}
+                            >
+                              <FaMinusCircle />
+                            </button>
+                            <span>{product.quantity}</span>
+                            <button
+                              className="icon"
+                              onClick={() =>
+                                handleQuantityChange(
+                                  product.name,
+                                  product.price,
+                                  1
+                                )
+                              }
+                            >
+                              <FaPlusCircle />
+                            </button>
+                          </div>
+                        </div>{" "}
+                        <div
+                          style={{
+                            width: "15%",
+                            textAlign: "right",
+                            paddingRight: "10px",
+                          }}
+                        >
+                          <div>
+                            {product.isFreeBogo ? (
+                              <span className="s-s-t-4">FREE</span>
+                            ) : (
+                              <span className="s-s-t-4">
+                                {product.price * product.quantity}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                      <hr className="hr" />
                     </>
                   ))}
                   {/* <div style={{ textAlign: "center" }}>{dash}</div> */}
@@ -1663,177 +1804,239 @@ display: none !important;
         </div>
       )}
 
-{bogoPickerOpen && bogoPaidProduct && (
-  <div className="bogo-picker-overlay">
-    <div className="bogo-picker-modal">
-      <h3>Choose your free pizza</h3>
+      {bogoPickerOpen && bogoPaidProduct && (
+        <div className="bogo-picker-overlay">
+          <div className="bogo-picker-modal">
+            <h3>Choose your free pizza</h3>
 
-      {(() => {
-        const normalize = (s) => (s || "").toLowerCase();
-        const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+            {(() => {
+              const normalize = (s) => (s || "").toLowerCase();
+              const capitalize = (s) =>
+                s ? s[0].toUpperCase() + s.slice(1) : s;
 
-        const pizzaInfo = BOGO_ELIGIBLE_PRODUCTS[bogoPaidProduct.name];
-        if (!pizzaInfo) return <p>No BOGO options available.</p>;
+              const pizzaInfo = BOGO_ELIGIBLE_PRODUCTS[bogoPaidProduct.name];
+              if (!pizzaInfo) return <p>No BOGO options available.</p>;
 
-        const paidSizeKey = normalize(bogoPaidProduct.size);
-        const freeSizeRaw = pizzaInfo.free?.[paidSizeKey];
-        const freeSize = normalize(freeSizeRaw);
+              const paidSizeKey = normalize(bogoPaidProduct.size);
+              const freeSizeRaw = pizzaInfo.free?.[paidSizeKey];
+              const freeSize = normalize(freeSizeRaw);
 
-        if (!freeSizeRaw) return <p>No free options for this size.</p>;
+              if (!freeSizeRaw) return <p>No free options for this size.</p>;
 
-        // Find pizzas on the menu that actually have the free size in their varieties
-        // (don't require that they appear in info.paid — that was blocking Reg)
-        const freeOptions = selectedProducts
-          .filter((p) =>
-            Array.isArray(p.varieties) &&
-            p.varieties.some((v) => v.size?.toLowerCase() === freeSize)
-          )
-          // optional: only include pizzas from BOGO_ELIGIBLE_PRODUCTS if you want to restrict
-          .filter((p) => Object.prototype.hasOwnProperty.call(BOGO_ELIGIBLE_PRODUCTS, p.name))
-          .map((p) => p.name);
+              // Find pizzas on the menu that actually have the free size in their varieties
+              // (don't require that they appear in info.paid — that was blocking Reg)
+              const freeOptions = selectedProducts
+                .filter(
+                  (p) =>
+                    Array.isArray(p.varieties) &&
+                    p.varieties.some((v) => v.size?.toLowerCase() === freeSize)
+                )
+                // optional: only include pizzas from BOGO_ELIGIBLE_PRODUCTS if you want to restrict
+                .filter((p) =>
+                  Object.prototype.hasOwnProperty.call(
+                    BOGO_ELIGIBLE_PRODUCTS,
+                    p.name
+                  )
+                )
+                .map((p) => p.name);
 
-        return freeOptions.length ? (
-          <ul>
-            {freeOptions.map((name) => (
-              <li key={name}>
-                <button
-                  onClick={() => {
-                    const freeProd = selectedProducts.find((p) => p.name === name);
-                    if (!freeProd) return;
-                    const freeVariety = freeProd.varieties.find(
-                      (v) => v.size.toLowerCase() === freeSize
-                    );
-                    if (!freeVariety) return;
+              return freeOptions.length ? (
+                <ul>
+                  {freeOptions.map((name) => (
+                    <li key={name}>
+                      <button
+                        onClick={() => {
+                          const freeProd = selectedProducts.find(
+                            (p) => p.name === name
+                          );
+                          if (!freeProd) return;
+                          const freeVariety = freeProd.varieties.find(
+                            (v) => v.size.toLowerCase() === freeSize
+                          );
+                          if (!freeVariety) return;
 
-                    setProductsToSend((prev) => [
-                      ...prev,
-                      {
-                        ...freeProd,
-                        size: freeVariety.size, // keep original casing for display
-                        price: 0,
-                        isFree: true,
-                        quantity: 1,
-                        originalPrice: freeVariety.price,
-                        paidProduct: bogoPaidProduct.name,
-                        paidSize: paidSizeKey,
-                      },
-                    ]);
+                          setProductsToSend((prev) => [
+                            ...prev,
+                            {
+                              ...freeProd,
+                              size: freeVariety.size, // keep original casing for display
+                              price: 0,
+                              isFree: true,
+                              quantity: 1,
+                              originalPrice: freeVariety.price,
+                              paidProduct: bogoPaidProduct.name,
+                              paidSize: paidSizeKey,
+                            },
+                          ]);
 
-                    setBogoDone((prev) => {
-                      const s = new Set(prev);
-                      s.add(bogoPaidProduct.name + paidSizeKey);
-                      return s;
-                    });
-                    setBogoPickerOpen(false);
-                    setBogoPaidProduct(null);
-                  }}
-                >
-                  {name} ({capitalize(freeSize)})
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No alternative pizzas available in {freeSize.toUpperCase()} size.</p>
-        );
-      })()}
+                          setBogoDone((prev) => {
+                            const s = new Set(prev);
+                            s.add(bogoPaidProduct.name + paidSizeKey);
+                            return s;
+                          });
+                          setBogoPickerOpen(false);
+                          setBogoPaidProduct(null);
+                        }}
+                      >
+                        {name} ({capitalize(freeSize)})
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>
+                  No alternative pizzas available in {freeSize.toUpperCase()}{" "}
+                  size.
+                </p>
+              );
+            })()}
 
-      <button
-        className="close-picker"
-        onClick={() => {
-          setBogoPickerOpen(false);
-          setBogoPaidProduct(null);
-        }}
-      >
-        Cancel
-      </button>
-    </div>
-  </div>
-)}
+            <button
+              className="close-picker"
+              onClick={() => {
+                setBogoPickerOpen(false);
+                setBogoPaidProduct(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {showCustomerModal && (
         <div className="modal-overlayy">
           <div className="modal-contentt" onClick={(e) => e.stopPropagation()}>
             <h3>Customer Details</h3>
             {/* Loading overlay */}
-            {isSaving && (
-              <div className="loading-overlay">
-                <div className="loading-spinner"></div>
-                <p>Saving and printing KOT...</p>
-              </div>
-            )}
-            <input
-              type="text"
-              placeholder="Customer Name"
-              value={customerInfo.name}
-              onChange={(e) =>
-                setCustomerInfo({ ...customerInfo, name: e.target.value })
-              }
-              disabled={isSaving}
-            />
-            <input
-              type="text"
-              placeholder="Customer Phone"
-              value={customerInfo.phone}
-              onChange={handleCustomerPhoneChange}
-              disabled={isSaving}
-            />
-            {phoneSuggestions.length > 0 && (
-              <ul
-                className="suggestions"
-                style={{
-                  position: "relative",
-                  zIndex: 3000,
-                  background: "#fff",
-                  border: "1px solid #ddd",
-                  listStyle: "none",
-                  margin: "6px 0",
-                  padding: 0,
-                  width: "100%",
-                  maxHeight: "150px",
-                  overflowY: "auto",
-                  borderRadius: "8px",
-                }}
-              >
-                {phoneSuggestions.map((s) => (
-                  <li
-                    key={s.phone + (s.name || "")}
-                    onClick={() => handleSuggestionClick(s)}
-                    style={{
-                      padding: ".5rem",
-                      cursor: "pointer",
-                      borderBottom: "1px solid #f0f0f0",
-                    }}
-                  >
-                    <strong>{s.phone}</strong> — {s.name || "No name"}
-                    {s.address ? (
-                      <div style={{ fontSize: "0.9rem", color: "#666" }}>
-                        {s.address}
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <input
-              type="text"
-              placeholder="Customer Address"
-              value={customerInfo.address}
-              onChange={(e) =>
-                setCustomerInfo({ ...customerInfo, address: e.target.value })
-              }
-              disabled={isSaving}
-            />
-            <div className="modal-buttons">
-              <button
-                onClick={() => setShowCustomerModal(false)}
+            <div className="modal-body">
+              {isSaving && (
+                <div className="loading-overlay">
+                  <div className="loading-spinner"></div>
+                  <p>Saving and printing KOT...</p>
+                </div>
+              )}
+              <input
+                type="text"
+                placeholder="Customer Name"
+                value={customerInfo.name}
+                onChange={(e) =>
+                  setCustomerInfo({ ...customerInfo, name: e.target.value })
+                }
                 disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button onClick={handleCustomerSubmit} disabled={isSaving}>
-                {isSaving ? "Processing..." : "Save & Print KOT"}
-              </button>
+              />
+              <input
+                type="text"
+                placeholder="Customer Phone"
+                value={customerInfo.phone}
+                onChange={handleCustomerPhoneChange}
+                disabled={isSaving}
+              />
+              {phoneSuggestions.length > 0 && (
+                <ul
+                  className="suggestions"
+                  style={{
+                    position: "relative",
+                    zIndex: 3000,
+                    background: "#fff",
+                    border: "1px solid #ddd",
+                    listStyle: "none",
+                    margin: "6px 0",
+                    padding: 0,
+                    width: "100%",
+                    maxHeight: "150px",
+                    overflowY: "auto",
+                    borderRadius: "8px",
+                  }}
+                >
+                  {phoneSuggestions.map((s) => (
+                    <li
+                      key={s.phone + (s.name || "")}
+                      onClick={() => handleSuggestionClick(s)}
+                      style={{
+                        padding: ".5rem",
+                        cursor: "pointer",
+                        borderBottom: "1px solid #f0f0f0",
+                      }}
+                    >
+                      <strong>{s.phone}</strong> — {s.name || "No name"}
+                      {s.address ? (
+                        <div style={{ fontSize: "0.9rem", color: "#666" }}>
+                          {s.address}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <input
+                type="text"
+                placeholder="Customer Address"
+                value={customerInfo.address}
+                onChange={(e) =>
+                  setCustomerInfo({ ...customerInfo, address: e.target.value })
+                }
+                disabled={isSaving}
+              />
+
+              <div className="form-group">
+                <label htmlFor="paymentMethod">Payment Method *</label>
+                <select
+                  id="paymentMethod"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  disabled={isSaving}
+                  required
+                >
+                  <option value="">Select Payment Method</option>
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="partial">Partial</option>
+                </select>
+              </div>
+
+              {/* When partial is selected show only a Cash field (editable). UPI is computed automatically and shown as read-only. */}
+              {paymentMethod === "partial" && (
+                <div className="partial-payment-fields">
+                  <div className="form-group">
+                    <label htmlFor="cashAmount">Cash Amount</label>
+                    <input
+                      id="cashAmount"
+                      type="text"
+                      placeholder="Enter cash amount"
+                      value={cashAmount}
+                      onChange={handleCashChange}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>UPI Amount (auto)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      placeholder="Enter upi amount"
+                      value={upiAmount}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="modal-buttons">
+                <button
+                  onClick={() => {
+                    setShowCustomerModal(false);
+                    setPaymentMethod("");
+                    setCashAmount("");
+                    setUpiAmount("");
+                  }}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </button>
+                <button onClick={handleCustomerSubmit} disabled={isSaving}>
+                  {isSaving ? "Processing..." : "Save & Print KOT"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

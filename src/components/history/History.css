@@ -216,3 +216,43 @@ hr{
   cursor: pointer;
 }
 
+.payment-totals {
+  display: flex;
+  justify-content: space-around;
+  margin: 1rem 0;
+}
+
+.cash-box, .upi-box {
+    padding: .3rem;
+    border-radius: 1rem 0rem;
+    text-align: center;
+    width: 45%;
+}
+
+.cash-box {
+  background-color: #e8f5e9;
+  border: 2px solid #4caf50;
+}
+
+.upi-box {
+  background-color: #e3f2fd;
+  border: 2px solid #2196f3;
+}
+
+.cash-box h3, .upi-box h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.cash-box h3 {
+    background: #e8f8f5;
+    color: #006753;
+}
+.upi-box h3{
+    background: #e3f2fd;
+    color: #0a314f;
+}
+.cash-box span, .upi-box span {
+  margin: 0 0 0 .5rem;
+  font-weight: bold;
+}
