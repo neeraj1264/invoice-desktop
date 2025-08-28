@@ -786,11 +786,11 @@ const Invoice = () => {
     setIsSaving(true);
 
     // Validate payment method is selected
-    if (!paymentMethod) {
-      toast.error("Please select a payment method", toastOptions);
-      setIsSaving(false);
-      return;
-    }
+    // if (!paymentMethod) {
+    //   toast.error("Please select a payment method", toastOptions);
+    //   setIsSaving(false);
+    //   return;
+    // }
 
     const total = calculateTotalPrice(productsToSend);
 
