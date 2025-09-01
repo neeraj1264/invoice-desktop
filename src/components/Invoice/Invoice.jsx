@@ -911,15 +911,15 @@ const Invoice = () => {
       };
 
       if (orderType === "delivery") {
-        const next = [...deliveryBills, kotEntry];
+        const next = [kotEntry, ...deliveryBills];
         setDeliveryBills(next);
         localStorage.setItem("deliveryKotData", JSON.stringify(next));
       } else if (orderType === "dine-in") {
-        const next = [...dineInBills, kotEntry];
+        const next = [kotEntry, ...dineInBills];
         setDineInBills(next);
         localStorage.setItem("dineInKotData", JSON.stringify(next));
       } else if (orderType === "takeaway") {
-        const next = [...takeawayBills, kotEntry];
+        const next = [kotEntry, ...takeawayBills];
         setTakeawayBills(next);
         localStorage.setItem("takeawayKotData", JSON.stringify(next));
       }
@@ -1107,6 +1107,7 @@ display: none !important;
     "Pizza small",
     "Pizza combo",
     "Pizza crust",
+    "Extra topping",
     "Burger",
     "Calzone",
     "Drinks",

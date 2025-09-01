@@ -10,6 +10,7 @@ export const CATEGORY_HIERARCHY = {
     "Pizza small",
     "Pizza combo",
     "Pizza crust",
+    "Extra topping"
   ],
   Burger: [
     "Burger",
