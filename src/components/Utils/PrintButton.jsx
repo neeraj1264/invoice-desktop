@@ -46,8 +46,10 @@ function buildMobileInvoiceHtml(order = {}) {
 
   const itemTotal = products.reduce((sum, p) => sum + (Number(p.price || 0) * (p.quantity || 1)), 0);
   const delivery = Number(order.delivery || 0) || 0;
+  const otherCharges = Number(order.otherCharges || 0) || 0;
+  const disposalCharges = Number(order.disposalCharges || 0) || 0;
   const discount = Number(order.discount || 0) || 0; // assume absolute amount
-  const netTotal = itemTotal + delivery - discount;
+  const netTotal = itemTotal + disposalCharges + otherCharges + delivery - discount;
 
   const html = `<!doctype html>
   <html>
@@ -112,6 +114,28 @@ function buildMobileInvoiceHtml(order = {}) {
           <div class="total">
             <p style="margin:0">Service Charge:</p>
             <p style="margin:0">+${delivery.toFixed(2)}</p>
+          </div>
+        ` : ""}
+
+        ${otherCharges !== 0 ? `
+          <div class="total">
+            <p style="margin:1rem 0 0 0">Item Total </p>
+            <p style="margin:0">₹${itemTotal.toFixed(2)}</p>
+          </div>
+          <div class="total">
+            <p style="margin:0">Other Charges:</p>
+            <p style="margin:0">+${otherCharges.toFixed(2)}</p>
+          </div>
+        ` : ""}
+
+        ${disposalCharges !== 0 ? `
+          <div class="total">
+            <p style="margin:1rem 0 0 0">Item Total </p>
+            <p style="margin:0">₹${itemTotal.toFixed(2)}</p>
+          </div>
+          <div class="total">
+            <p style="margin:0">Disposal Charges:</p>
+            <p style="margin:0">+${disposalCharges.toFixed(2)}</p>
           </div>
         ` : ""}
 

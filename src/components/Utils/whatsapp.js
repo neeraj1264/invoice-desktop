@@ -67,6 +67,14 @@ export function formatOrderMessage({
     lines.push(`Service Charge: +₹${parseFloat(delivery).toFixed(2)}`);
   }
 
+  if (otherCharges && parseFloat(otherCharges) > 0) {
+    lines.push(`other Charges: +₹${parseFloat(otherCharges).toFixed(2)}`);
+  }
+
+  if (disposalCharges && parseFloat(disposalCharges) > 0) {
+    lines.push(`disposal Charges: +₹${parseFloat(disposalCharges).toFixed(2)}`);
+  }
+
   // discount can be number (amount) or object; handle as amount for now
   if (discount && parseFloat(discount) > 0) {
     lines.push(`Discount: -₹${parseFloat(discount).toFixed(2)}`);

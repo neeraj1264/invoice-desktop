@@ -427,6 +427,30 @@ const History = () => {
                             </tr>
                           )}
 
+                             {/* otherCharges ROW */}
+                          {order.otherCharges > 0 && (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: "right" }}>
+                                <strong>other Charges:</strong>
+                              </td>
+                              <td style={{ textAlign: "right" }}>
+                                <strong>+{order.otherCharges}</strong>
+                              </td>
+                            </tr>
+                          )}
+
+                                    {/* disposalCharges ROW */}
+                          {order.disposalCharges > 0 && (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: "right" }}>
+                                <strong>disposal Charges:</strong>
+                              </td>
+                              <td style={{ textAlign: "right" }}>
+                                <strong>+{order.disposalCharges}</strong>
+                              </td>
+                            </tr>
+                          )}
+
                           {(order.cashAmount || order.upiAmount) && (
                             <>
                               {order.cashAmount > 0 && (

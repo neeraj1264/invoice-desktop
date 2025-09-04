@@ -138,10 +138,12 @@ const Invoice = () => {
           name: "",
           phone: "",
           address: "",
+          otherCharges: "", 
+          disposalCharges: "",
         }
       );
     } catch {
-      return { name: "", phone: "", address: "" };
+      return { name: "", phone: "", address: "", otherCharges: "", disposalCharges: "" };
     }
   });
   const phoneInputRef = useRef(null);
@@ -186,6 +188,20 @@ const Invoice = () => {
 
   const [bogoEnabled, setBogoEnabled] = useState(false);
   const [isThursday, setIsThursday] = useState(false);
+
+    // Helper function to calculate total price
+  const calculateTotalPrice = (products = []) => {
+    return products.reduce(
+      (total, product) => total + product.price * product.quantity,
+      0
+    );
+  };
+    // --- computed totals including otherCharges ---
+  const productsTotal = calculateTotalPrice(productsToSend);
+  const otherChargesAmount = parseFloat(customerInfo.otherCharges || 0) || 0;
+  const disposalChargesAmount = parseFloat(customerInfo.disposalCharges || 0) || 0;
+  const grandTotal = productsTotal + otherChargesAmount + disposalChargesAmount;
+
   // Effect to check day of week and automatically enable BOGO on Thursdays
   useEffect(() => {
     const checkDay = () => {
@@ -458,6 +474,31 @@ const Invoice = () => {
     }
   };
 
+      // --- new handler for other charges input ---
+  const handleOtherChargesChange = (e) => {
+    const value = e.target.value;
+    // allow empty or numeric/decimal
+    if (value === "") {
+      setCustomerInfo((prev) => ({ ...prev, otherCharges: "" }));
+      return;
+    }
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    // keep as string for consistent UI; parse when needed
+    setCustomerInfo((prev) => ({ ...prev, otherCharges: value }));
+  };
+
+    // --- new handler for disposal charges input ---
+  const handledisposalChargesChange = (e) => {
+    const value = e.target.value;
+    // allow empty or numeric/decimal
+    if (value === "") {
+      setCustomerInfo((prev) => ({ ...prev, disposalCharges: "" }));
+      return;
+    }
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    // keep as string for consistent UI; parse when needed
+    setCustomerInfo((prev) => ({ ...prev, disposalCharges: value }));
+  };
   // recompute suggestions whenever phone changes
   useEffect(() => {
     const q = (customerInfo.phone || "").trim();
@@ -476,7 +517,7 @@ const Invoice = () => {
   // Add useEffect to calculate the difference when one amount is entered
   useEffect(() => {
     if (paymentMethod === "partial") {
-      const total = calculateTotalPrice(productsToSend);
+      const total = calculateTotalPrice(productsToSend) + (parseFloat(customerInfo.otherCharges) || 0) + (parseFloat(customerInfo.disposalCharges) || 0);
       const cash = parseFloat(cashAmount) || 0;
       // If cashAmount is an empty string we consider cash = 0 but keep cash input empty so placeholder shows
       const remaining = Math.max(0, total - cash);
@@ -487,7 +528,7 @@ const Invoice = () => {
       setCashAmount("");
       setUpiAmount("");
     }
-  }, [cashAmount, paymentMethod, productsToSend]);
+  }, [cashAmount, paymentMethod, productsToSend, customerInfo.otherCharges, customerInfo.disposalCharges]);
 
   const handleSuggestionClick = (cust) => {
     setCustomerInfo({
@@ -729,14 +770,6 @@ const Invoice = () => {
     }
   };
 
-  // Helper function to calculate total price
-  const calculateTotalPrice = (products = []) => {
-    return products.reduce(
-      (total, product) => total + product.price * product.quantity,
-      0
-    );
-  };
-
   const handleCategoryClick = (category) => {
     const categoryElement = document.getElementById(category);
     if (categoryElement) {
@@ -792,7 +825,10 @@ const Invoice = () => {
     //   return;
     // }
 
-    const total = calculateTotalPrice(productsToSend);
+    const itemsTotal = calculateTotalPrice(productsToSend);
+    const other = parseFloat(customerInfo.otherCharges) || 0;
+    const disposal = parseFloat(customerInfo.disposalCharges) || 0;
+    const total = itemsTotal + other + disposal;
 
     // Validate partial amounts
     if (paymentMethod === "partial") {
@@ -849,6 +885,8 @@ const Invoice = () => {
         phone: customerInfo.phone,
         address: customerInfo.address,
         timestamp: new Date().toISOString(),
+        otherCharges: other,
+        disposalCharges: disposal,
         paymentMethod,
         cashAmount:
           paymentMethod === "cash"
@@ -864,6 +902,7 @@ const Invoice = () => {
             : 0,
       };
 
+      console.log("orderData: ", orderData)
       const customerData = {
         id: orderId,
         name: customerInfo.name,
@@ -908,6 +947,8 @@ const Invoice = () => {
         customerName: customerInfo.name,
         customerPhone: customerInfo.phone,
         customerAddress: customerInfo.address,
+        otherCharges: other,
+        disposalCharges: disposal,
       };
 
       if (orderType === "delivery") {
@@ -932,6 +973,7 @@ const Invoice = () => {
       setPaymentMethod("");
       setCashAmount("");
       setUpiAmount("");
+      setCustomerInfo({ name: "", phone: "", address: "", otherCharges: "", disposalCharges: ""});
 
       setShowCustomerModal(false);
       setPhoneSuggestions([]);
@@ -946,6 +988,10 @@ const Invoice = () => {
 Bill No. ${billNo}
 </div>
 `;
+
+ // include other charges line in print
+      const otherLine = other > 0 ? `<div>Other Charges: Rs. ${other}</div>` : "";
+      const disposalLine = disposal > 0 ? `<div>Disposal Charges: Rs. ${disposal}</div>` : "";
 
       const printContent =
         header +
@@ -1627,6 +1673,7 @@ display: none !important;
                       <span className="kot-date">{order.date}</span>
                     </h4>
                     <h4>Order No. RT-{order.orderNo}</h4>
+                    <hr />
                     <h4>
                       {order.customerName && (
                         <p style={{ fontWeight: 700 }}>{order.customerName}</p>
@@ -1653,10 +1700,25 @@ display: none !important;
                         </>
                       ))}
                     </ul>
+
+                     {/* show extra charges (only if present) */}
+        {order.otherCharges > 0 && (
+          <div className="kot-extra-line" style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+            <span>Other Charges</span>
+            <span>₹{order.otherCharges.toFixed(2)}</span>
+          </div>
+        )}
+
+        {order.disposalCharges > 0 && (
+          <div className="kot-extra-line" style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+            <span>Disposal Charges</span>
+            <span>₹{order.disposalCharges.toFixed(2)}</span>
+          </div>
+        )}
                     {/* Show total amount */}
                     <div className="kot-total">
                       <strong>Total </strong>
-                      <strong>₹{totalAmount.toFixed(2)}</strong>
+                      <strong>₹{(totalAmount + order.disposalCharges + order.otherCharges).toFixed(2)}</strong>
                     </div>
                     <div className="kot-entry-actions">
                       <button
@@ -1698,6 +1760,9 @@ display: none !important;
                           timestamp: order.timestamp,
                           delivery: order.delivery || 0,
                           discount: order.discount || 0,
+                          otherCharges: order.otherCharges || 0,
+                          disposalCharges: order.disposalCharges || 0,
+
                         }}
                         label={<FaFileInvoice size={20} />}
                         className="invoice-action-icon action-icon"
@@ -1980,6 +2045,29 @@ display: none !important;
                 disabled={isSaving}
               />
 
+                  {/* NEW: Other Charges input */}
+              <div className="form-group">
+                <input
+                  id="otherCharges"
+                  type="text"
+                  placeholder="other charges (optional)"
+                  value={customerInfo.otherCharges}
+                  onChange={handleOtherChargesChange}
+                  disabled={isSaving}
+                />
+              </div>
+
+                     {/* NEW: disposal Charges input */}
+              <div className="form-group">
+                <input
+                  id="disposalCharges"
+                  type="text"
+                  placeholder="disposal Charges (optional)"
+                  value={customerInfo.disposalCharges}
+                  onChange={handledisposalChargesChange}
+                  disabled={isSaving}
+                />
+              </div>
               <div className="form-group">
                 <label htmlFor="paymentMethod">Payment Method *</label>
                 <select
