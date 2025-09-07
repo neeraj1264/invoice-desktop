@@ -997,9 +997,10 @@ Bill No. ${billNo}
         header +
         (customerInfo.name ? `<div>Name: ${customerInfo.name}</div>` : "") +
         (customerInfo.phone ? `<div>Phone: ${customerInfo.phone}</div>` : "") +
+         otherLine +
+    disposalLine +
         printArea.innerHTML;
 
-      const win = window.open("", "", "width=600,height=400");
       const style = `<style>
 @page { size: 58mm 400mm; margin:0; }
 @media print {
@@ -1018,25 +1019,15 @@ display: none !important;
 }
 </style>`;
 
-      win.document.write(
-        `<html>
-    <head>
-    <title>KOT Ticket</title>
-    ${style}
-      </head>
-      <body>
-      ${printContent}
-      </body>
-      </html>`
-      );
-      win.document.close();
-      win.focus();
-      win.print();
-      win.close();
+  const printSuccess = await printKOTContent(printContent, style);
 
-      const empty = { name: "", phone: "", address: "" };
-      setCustomerInfo(empty);
-      localStorage.removeItem("customerInfo");
+    if (!printSuccess) {
+    toast.error("Failed to print KOT. Please check popup settings.", toastOptions);
+  }
+   const empty = { name: "", phone: "", address: "" };
+  setCustomerInfo(empty);
+  localStorage.removeItem("customerInfo");
+
     } catch (error) {
       console.error("Error in KOT process:", error);
       toast.error("Error processing KOT", toastOptions);
@@ -1044,6 +1035,75 @@ display: none !important;
       setIsSaving(false); // End loading Regardless of success/error
     }
   };
+
+  // Add this helper function outside your component
+const printKOTContent = (content, style) => {
+  return new Promise((resolve) => {
+    try {
+      // Try to open print window
+      const win = window.open('', '_blank', 'width=600,height=400');
+      
+      if (win) {
+        // If window opened successfully
+        win.document.write(`
+          <html>
+            <head>
+              <title>KOT Ticket</title>
+              ${style}
+            </head>
+            <body>${content}</body>
+          </html>
+        `);
+        win.document.close();
+        win.focus();
+        
+        // Add delay for content to render before printing
+        setTimeout(() => {
+          win.print();
+          // Wait before resolving to ensure printing completes
+          setTimeout(() => {
+            win.close();
+            resolve(true);
+          }, 300);
+        }, 500);
+      } else {
+        // Fallback to iframe printing if popup blocked
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        iframeDoc.write(`
+          <html>
+            <head>
+              <title>KOT Ticket</title>
+              ${style}
+            </head>
+            <body>${content}</body>
+          </html>
+        `);
+        iframeDoc.close();
+        
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          
+          // Remove iframe after printing and resolve
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            resolve(true);
+          }, 100);
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Print error:', error);
+      resolve(false);
+    }
+  });
+};
 
   // CASH input handler: allow empty string, numeric values; if greater than total show toast and cap to total
   const handleCashChange = (e) => {
