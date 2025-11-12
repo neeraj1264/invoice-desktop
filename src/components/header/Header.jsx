@@ -189,7 +189,7 @@ const Header = ({ headerName, setSearch, onClick }) => {
                 to="/customer-data"
                 onClick={guardcustomerdata}
               >
-                Customer Data
+                Customer ledger
               </NavLink>
             </li>
             <li className="nav-item">
