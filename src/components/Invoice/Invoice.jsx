@@ -188,6 +188,9 @@ const Invoice = () => {
 
   const [bogoEnabled, setBogoEnabled] = useState(false);
   const [isThursday, setIsThursday] = useState(false);
+  // new state
+const [pendingAmount, setPendingAmount] = useState(""); // shown in modal
+const [autoFilledPending, setAutoFilledPending] = useState(false); // track if we auto-filled
 
     // Helper function to calculate total price
   const calculateTotalPrice = (products = []) => {
@@ -459,14 +462,46 @@ const Invoice = () => {
   }, []);
 
   // call this from phone input's onChange
-  const handleCustomerPhoneChange = (e) => {
+  const handleCustomerPhoneChange = async(e) => {
     const phoneValue = e.target.value;
     // allow only digits, max 10
     if (/^\d*$/.test(phoneValue) && phoneValue.length <= 10) {
       setCustomerInfo((prev) => ({ ...prev, phone: phoneValue }));
-
+        setAutoFilledPending(false);
+  setPendingAmount("");
       // immediately hide suggestions when we reach 10 digits
+        const digitsOnly = (phoneVal || "").replace(/\D/g, "");
       if (phoneValue.length === 10) {
+           try {
+
+      const list = await fetchcustomerdata();
+      const found = list.find(
+        (c) => String(c.phone).replace(/\D/g, "") === digitsOnly
+      );
+
+      if (found) {
+        const pending = found.youwillget != null
+          ? Number(found.youwillget)
+          : (Number(found.youwillget || 0) - Number(found.youwillgave || 0));
+
+        setPendingAmount(pending ? String(pending) : "0");
+        setAutoFilledPending(true);
+        // also fill name/address if available
+        setCustomerInfo((prev) => ({
+          ...prev,
+          name: prev.name || found.name || "",
+          address: prev.address || found.address || "",
+        }));
+      } else {
+        // not found: keep pending empty or 0
+        setPendingAmount("0");
+        setAutoFilledPending(false);
+      }
+    } catch (err) {
+      console.error("Failed to lookup customer by phone:", err);
+      setPendingAmount("0");
+      setAutoFilledPending(false);
+    }
         setPhoneSuggestions([]);
         // blur to collapse mobile suggestion/keyboard UI if needed
         if (phoneInputRef.current) phoneInputRef.current.blur();
@@ -536,6 +571,12 @@ const Invoice = () => {
       phone: String(cust.phone || ""),
       address: cust.address || "",
     });
+      // compute pending either from totalOwed or lifetimeSale - receivedAmount
+  const pending = cust.youwillget != null
+    ? (Number(cust.youwillgave || 0) - Number(cust.youwillget || 0))
+    : 0;
+      setPendingAmount(pending ? String(pending) : "0");
+  setAutoFilledPending(true); // note we auto-filled
     setPhoneSuggestions([]);
     if (phoneInputRef.current) {
       phoneInputRef.current.blur();
@@ -874,6 +915,8 @@ const Invoice = () => {
       const billNo = String(nextNo).padStart(4, "0");
       const orderId = `order_${Date.now()}`;
 
+        const pendingNum = Number((pendingAmount || "0").replace(/[^\d.-]/g, "")) || 0;
+
       const orderData = {
         id: orderId,
         orderNumber: orderNumberToUse,
@@ -888,6 +931,7 @@ const Invoice = () => {
         otherCharges: other,
         disposalCharges: disposal,
         paymentMethod,
+          pendingAmount: pendingNum,
         cashAmount:
           paymentMethod === "cash"
             ? total
@@ -949,7 +993,9 @@ const Invoice = () => {
         customerAddress: customerInfo.address,
         otherCharges: other,
         disposalCharges: disposal,
+        pendingAmount: pendingNum,
       };
+      console.log("kot entries: ", kotEntry)
 
       if (orderType === "delivery") {
         const next = [kotEntry, ...deliveryBills];
@@ -1780,6 +1826,9 @@ const printKOTContent = (content, style) => {
                       <strong>Total </strong>
                       <strong>₹{(totalAmount + order.disposalCharges + order.otherCharges).toFixed(2)}</strong>
                     </div>
+                    {order.pendingAmount > 0 && (
+                      <p style={{ textAlign: "center", fontWeight: "bold", color: "red" }}>Pending Amount: {order.pendingAmount}</p>
+                    )}
                     <div className="kot-entry-actions">
                       <button
                         onClick={() => {
@@ -1822,7 +1871,7 @@ const printKOTContent = (content, style) => {
                           discount: order.discount || 0,
                           otherCharges: order.otherCharges || 0,
                           disposalCharges: order.disposalCharges || 0,
-
+                          pendingAmount: order.pendingAmount || 0,
                         }}
                         label={<FaFileInvoice size={20} />}
                         className="invoice-action-icon action-icon"
@@ -2128,6 +2177,27 @@ const printKOTContent = (content, style) => {
                   disabled={isSaving}
                 />
               </div>
+
+              {/* NEW: Pending amount (auto-filled from khatabook) */}
+<div className="form-group">
+  <label>Pending Amount (from khatabook)</label>
+  <input
+    type="text"
+    value={pendingAmount}
+    onChange={(e) => {
+      setPendingAmount(e.target.value);
+      setAutoFilledPending(false); // user changed it
+    }}
+    placeholder="0"
+  />
+  {autoFilledPending && (
+    <small style={{ color: "#666" }}>
+      Auto-filled from khatabook — you can edit if needed.
+    </small>
+  )}
+</div>
+
+
               <div className="form-group">
                 <label htmlFor="paymentMethod">Payment Method *</label>
                 <select

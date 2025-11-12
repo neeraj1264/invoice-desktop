@@ -47,6 +47,7 @@ function buildMobileInvoiceHtml(order = {}) {
   const itemTotal = products.reduce((sum, p) => sum + (Number(p.price || 0) * (p.quantity || 1)), 0);
   const delivery = Number(order.delivery || 0) || 0;
   const otherCharges = Number(order.otherCharges || 0) || 0;
+  const pendingAmount = Number(order.pendingAmount || 0) || 0;
   const disposalCharges = Number(order.disposalCharges || 0) || 0;
   const discount = Number(order.discount || 0) || 0; // assume absolute amount
   const netTotal = itemTotal + disposalCharges + otherCharges + delivery - discount;
@@ -147,6 +148,9 @@ function buildMobileInvoiceHtml(order = {}) {
         ` : ""}
 
         <p class="totalAmount">Net Total: ₹${netTotal.toFixed(2)}</p>
+        ${(pendingAmount > 0) ? `
+        <p style="text-align: center">pending Amount: ${pendingAmount}</p>
+        `: ""}
         <hr />
         <div style="text-align:center; font-size:15px; padding:.1rem 0 1rem; margin: .5rem">Thank You Visit Again!</div>
         <div style="text-align:center; font-size:15px; padding:.1rem 0 1rem; margin: .5rem; color: grey">Powered By Billzo || 7015823645</div>
