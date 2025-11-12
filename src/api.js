@@ -124,3 +124,30 @@ export const removeOrder = async (orderId) => {
 
   return response.json(); // Return the API response
 };
+
+export const addKhataTransaction = async (customerId, txn) => {
+  const response = await fetch(`${BASE_URL}/customerdata/${customerId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(txn), // example: { type: "received", amount: 500 }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to add transaction: ${response.statusText}`);
+  }
+
+  return response.json(); // return updated customer or transaction
+};
+
+export const deleteKhataTransaction = async (customerId, transactionId) => {
+  const response = await fetch(`${BASE_URL}/customerdata/${customerId}/transactions/${transactionId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete transaction: ${response.statusText}`);
+  }
+
+  return response.json(); // optional: depends on your backend response
+};

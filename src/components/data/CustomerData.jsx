@@ -193,7 +193,7 @@ export const CustomerData = () => {
                                         {order.products.map(
                                           (product, pIndex) => (
                                             <li key={pIndex}>
-                                              {pIndex + 1}. {product.name}
+                                              {pIndex + 1}. {product.name}: {product.price} x {product.quantity} = {product.quantity * product.price}
                                             </li>
                                           )
                                         )}
