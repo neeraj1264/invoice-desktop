@@ -60,47 +60,6 @@ export default function KhataBook() {
     }
   };
 
- const handleNewCustomerChange = (field, value) => {
-  setSelectedCustomerId(null);
-  setNewCustomer((prev) => ({ ...prev, [field]: value }));
-
-  const raw = String(value || "").trim();
-  if (!raw) {
-    setSuggestions([]);
-    return;
-  }
-
-  const qLower = raw.toLowerCase();
-  const qDigits = raw.replace(/\D/g, ""); // digits-only part
-  const qAlpha = raw.replace(/[^a-zA-Z\s]/g, "").trim(); // letters-only part (optional)
-
-  const matches = customers.filter((c) => {
-    const name = (c.name || "").toLowerCase();
-    const phone = c.phone != null ? String(c.phone).replace(/\D/g, "") : "";
-
-    // name match only if query has some alphabetic chars
-    const nameMatch = qAlpha.length > 0 && name.includes(qLower);
-
-    // phone match only if query has digits
-    const phoneMatch = qDigits.length > 0 && phone.includes(qDigits);
-
-    return nameMatch || phoneMatch;
-  }).slice(0, 8);
-
-  setSuggestions(matches);
-};
-
-
-  // when user clicks a suggestion
-  const handleSelectSuggestion = (c) => {
-    setNewCustomer({
-      name: c.name || "",
-      phone: c.phone != null ? String(c.phone) : "",
-    });
-    setSelectedCustomerId(c._id || null);
-    setSuggestions([]);
-  };
-
   // nice UX: Enter should select first suggestion if one is visible
   const handleSuggestionKeyDown = (e) => {
     if (e.key === "Enter" && suggestions.length > 0) {
@@ -131,15 +90,19 @@ export default function KhataBook() {
     }
 
     // ✅ ensure default values for new customer
-    const customerData = {
-      ...newCustomer,
-      totalCash: 0,
-      totalOwed: 0,
-    };
+  const customerData = {
+    id: Date.now().toString(), // simple unique id for now
+    timestamp: new Date().toISOString(),
+    name: newCustomer.name.trim(),
+    phone: String(newCustomer.phone).trim(),
+    totalCash: 0,
+    totalOwed: 0,
+  };
 
-    try {
-      setLoading(true);
-      await setdata(customerData);
+  try {
+    setLoading(true);
+    const res = await setdata(customerData); // optional: capture response
+    console.log("Created customer:", res);
       setNewCustomer({ name: "", phone: "" });
       setShowAddCustomer(false);
       await loadCustomers();
@@ -324,8 +287,8 @@ const filteredCustomers = customers.filter((c) => {
             <i className="fas fa-book"></i> Khata Book
           </h1>
           <div className="header-actions">
-            {/* <button onClick={() => setShowAddCustomer(!showAddCustomer)}> */}
-            <button onClick={()=> alert("customer add temporary closed")}>
+            <button onClick={() => setShowAddCustomer(!showAddCustomer)}>
+            {/* <button onClick={()=> alert("customer add temporary closed")}> */}
               <i className="fas fa-user-plus"></i>
             </button>
             <button onClick={() => setShowSearch(!showSearch)}>
@@ -367,43 +330,24 @@ const filteredCustomers = customers.filter((c) => {
           <div className="add-customer-box">
             <h3>Add New Customer</h3>
             <div className="input-group">
-             <div className="suggestion-field">
               <input
                 placeholder="Name"
                 value={newCustomer.name}
-               onChange={(e) => handleNewCustomerChange("name", e.target.value)}
+               onChange={(e) =>
+                  setNewCustomer({ ...newCustomer, name: e.target.value })
+                }
       onKeyDown={(e) => handleSuggestionKeyDown(e)}
       autoComplete="off"
               />
-               {/* suggestions dropdown for name */}
-    {suggestions.length > 0 && (
-      <ul className="suggestions-list" role="listbox">
-        {suggestions.map((s, idx) => (
-          <li
-            key={s._id || `${s.name}-${idx}`}
-            role="option"
-            tabIndex={0}
-            onMouseDown={() => handleSelectSuggestion(s)} // mouseDown to avoid input blur before click
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSelectSuggestion(s);
-            }}
-          >
-            <strong>{s.name}</strong>
-            {s.phone ? <span className="muted"> — {s.phone}</span> : null}
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
-   <div className="suggestion-field">
               <input
                 placeholder="Phone Number"
                 value={newCustomer.phone}
-               onChange={(e) => handleNewCustomerChange("phone", e.target.value)}
+               onChange={(e) =>
+                  setNewCustomer({ ...newCustomer, phone: e.target.value.replace(/\D/g, "") })
+                }
       onKeyDown={(e) => handleSuggestionKeyDown(e)}
       autoComplete="off"
               />
-              </div>
             </div>
             <div className="form-actions">
               <button

@@ -191,7 +191,6 @@ const Invoice = () => {
   // new state
 const [pendingAmount, setPendingAmount] = useState(""); // shown in modal
 const [autoFilledPending, setAutoFilledPending] = useState(false); // track if we auto-filled
-
     // Helper function to calculate total price
   const calculateTotalPrice = (products = []) => {
     return products.reduce(
@@ -470,7 +469,7 @@ const [autoFilledPending, setAutoFilledPending] = useState(false); // track if w
         setAutoFilledPending(false);
   setPendingAmount("");
       // immediately hide suggestions when we reach 10 digits
-        const digitsOnly = (phoneVal || "").replace(/\D/g, "");
+        const digitsOnly = (phoneValue || "").replace(/\D/g, "");
       if (phoneValue.length === 10) {
            try {
 
@@ -484,8 +483,14 @@ const [autoFilledPending, setAutoFilledPending] = useState(false); // track if w
           ? Number(found.youwillget)
           : (Number(found.youwillget || 0) - Number(found.youwillgave || 0));
 
-        setPendingAmount(pending ? String(pending) : "0");
+           if (pending > 0) {
+        setPendingAmount(String(pending));
         setAutoFilledPending(true);
+         } else {
+          // don't auto-fill zero/negative
+          setPendingAmount("");
+          setAutoFilledPending(false);
+        }
         // also fill name/address if available
         setCustomerInfo((prev) => ({
           ...prev,
@@ -493,8 +498,8 @@ const [autoFilledPending, setAutoFilledPending] = useState(false); // track if w
           address: prev.address || found.address || "",
         }));
       } else {
-        // not found: keep pending empty or 0
-        setPendingAmount("0");
+        // not found: keep pending empty 
+        setPendingAmount("");
         setAutoFilledPending(false);
       }
     } catch (err) {
@@ -573,10 +578,15 @@ const [autoFilledPending, setAutoFilledPending] = useState(false); // track if w
     });
       // compute pending either from totalOwed or lifetimeSale - receivedAmount
   const pending = cust.youwillget != null
-    ? (Number(cust.youwillgave || 0) - Number(cust.youwillget || 0))
+    ? (Number(cust.youwillget || 0) - Number(cust.youwillgave || 0))
     : 0;
-      setPendingAmount(pending ? String(pending) : "0");
-  setAutoFilledPending(true); // note we auto-filled
+  if (pending > 0) {
+    setPendingAmount(String(pending));
+    setAutoFilledPending(true);
+  } else {
+    setPendingAmount("");
+    setAutoFilledPending(false);
+  }
     setPhoneSuggestions([]);
     if (phoneInputRef.current) {
       phoneInputRef.current.blur();
