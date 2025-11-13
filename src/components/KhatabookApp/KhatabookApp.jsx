@@ -402,7 +402,7 @@ const filteredCustomers = customers.filter((c) => {
                     <div className="customer-avatar">
                       {c.name.charAt(0).toUpperCase()}
                     </div>
-                    <div className="customer-details">
+                    <div className="customer-detail">
                       <h3>{c.name}</h3>
                       <p>{c.phone}</p>
                     </div>
@@ -514,12 +514,12 @@ const filteredCustomers = customers.filter((c) => {
 
                       {/* Contact Row */}
                       <div className="contact-row">
-                        {owed > 0 && (
+                        {totalYouWillGet > 0  && (
                           <>
                             <button
                               className="contact-btn whatsappp"
                               onClick={() => {
-                                const message = `Chhinnamastika Traders requests a payment of ${formatCurrency(
+                                const message = `Urban Pizzeria requests a payment of ${formatCurrency(
                                   Math.abs(owed)
                                 )}. Please clear your dues.`;
                                 window.open(
@@ -536,7 +536,7 @@ const filteredCustomers = customers.filter((c) => {
                             <button
                               className="contact-btn sms"
                               onClick={() => {
-                                const message = `Chhinnamastika Traders requests a payment of ${formatCurrency(
+                                const message = `Urban Pizzeria requests a payment of ${formatCurrency(
                                   Math.abs(owed)
                                 )}. Please clear your dues.`;
                                 window.open(

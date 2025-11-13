@@ -191,17 +191,17 @@
   overflow-wrap: break-word; 
   white-space: normal;     /* Prevent text from staying in one line */
 }
-.customer-details {
+.customer-detail {
   flex: 1;
 }
 
-.customer-details h3 {
+.customer-detail h3 {
   margin: 0;
   font-size: 1.1rem;
   color: #2a2a2a;
 }
 
-.customer-details p {
+.customer-detail p {
   margin: 0;
   font-size: 0.9rem;
   color: #666;
