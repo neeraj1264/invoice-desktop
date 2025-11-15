@@ -27,8 +27,8 @@ export default function KhataBook() {
   const [loadingTransaction, setLoadingTransaction] = useState(false);
   const [showDeleteIconFor, setShowDeleteIconFor] = useState(null);
   const [advanceFeatured, setAdvanceFeatured] = useState(
-  localStorage.getItem("advancedFeature") === "true"
-);
+    localStorage.getItem("advancedFeature") === "true"
+  );
   useEffect(() => {
     loadCustomers();
   }, []);
@@ -71,9 +71,8 @@ export default function KhataBook() {
     }
   };
 
-
   const handleAddCustomer = async () => {
-      // If user has selected an existing customer, open their record instead of creating duplicate
+    // If user has selected an existing customer, open their record instead of creating duplicate
     if (selectedCustomerId) {
       // open existing (expand their card)
       setShowAddCustomer(false);
@@ -90,19 +89,19 @@ export default function KhataBook() {
     }
 
     // ✅ ensure default values for new customer
-  const customerData = {
-    id: Date.now().toString(), // simple unique id for now
-    timestamp: new Date().toISOString(),
-    name: newCustomer.name.trim(),
-    phone: String(newCustomer.phone).trim(),
-    totalCash: 0,
-    totalOwed: 0,
-  };
+    const customerData = {
+      id: Date.now().toString(), // simple unique id for now
+      timestamp: new Date().toISOString(),
+      name: newCustomer.name.trim(),
+      phone: String(newCustomer.phone).trim(),
+      totalCash: 0,
+      totalOwed: 0,
+    };
 
-  try {
-    setLoading(true);
-    const res = await setdata(customerData); // optional: capture response
-    console.log("Created customer:", res);
+    try {
+      setLoading(true);
+      const res = await setdata(customerData); // optional: capture response
+      console.log("Created customer:", res);
       setNewCustomer({ name: "", phone: "" });
       setShowAddCustomer(false);
       await loadCustomers();
@@ -142,20 +141,18 @@ export default function KhataBook() {
       minimumFractionDigits: 0,
     }).format(amount);
 
- // 🔍 Filter customers by search query (robust to phone being number or string)
-const filteredCustomers = customers.filter((c) => {
-  const q = (searchQuery || "").trim();
-  if (!q) return true; // no query => keep all
+  // 🔍 Filter customers by search query (robust to phone being number or string)
+  const filteredCustomers = customers.filter((c) => {
+    const q = (searchQuery || "").trim();
+    if (!q) return true; // no query => keep all
 
-  const nameMatch =
-    c.name && c.name.toLowerCase().includes(q.toLowerCase());
+    const nameMatch = c.name && c.name.toLowerCase().includes(q.toLowerCase());
 
-  const phoneStr = c.phone != null ? String(c.phone).replace(/\D/g, "") : "";
-  const phoneMatch = phoneStr.includes(q);
+    const phoneStr = c.phone != null ? String(c.phone).replace(/\D/g, "") : "";
+    const phoneMatch = phoneStr.includes(q);
 
-  return nameMatch || phoneMatch;
-});
-
+    return nameMatch || phoneMatch;
+  });
 
   // 🔽 Add these derived totals before return
   const totalYouWillGet = customers.reduce((sum, c) => {
@@ -252,9 +249,11 @@ const filteredCustomers = customers.filter((c) => {
   };
 
   const handleDeleteTransaction = async (customerId, transactionId) => {
-      if (!advanceFeatured) {
+    if (!advanceFeatured) {
       // quick feedback — you can replace with a nicer UI/toast
-      alert("Delete transaction is an advanced feature. Please enable it to delete transactions.");
+      alert(
+        "Delete transaction is an advanced feature. Please enable it to delete transactions."
+      );
       return;
     }
     if (!window.confirm("Are you sure you want to delete this transaction?"))
@@ -288,7 +287,7 @@ const filteredCustomers = customers.filter((c) => {
           </h1>
           <div className="header-actions">
             <button onClick={() => setShowAddCustomer(!showAddCustomer)}>
-            {/* <button onClick={()=> alert("customer add temporary closed")}> */}
+              {/* <button onClick={()=> alert("customer add temporary closed")}> */}
               <i className="fas fa-user-plus"></i>
             </button>
             <button onClick={() => setShowSearch(!showSearch)}>
@@ -333,20 +332,23 @@ const filteredCustomers = customers.filter((c) => {
               <input
                 placeholder="Name"
                 value={newCustomer.name}
-               onChange={(e) =>
+                onChange={(e) =>
                   setNewCustomer({ ...newCustomer, name: e.target.value })
                 }
-      onKeyDown={(e) => handleSuggestionKeyDown(e)}
-      autoComplete="off"
+                onKeyDown={(e) => handleSuggestionKeyDown(e)}
+                autoComplete="off"
               />
               <input
                 placeholder="Phone Number"
                 value={newCustomer.phone}
-               onChange={(e) =>
-                  setNewCustomer({ ...newCustomer, phone: e.target.value.replace(/\D/g, "") })
+                onChange={(e) =>
+                  setNewCustomer({
+                    ...newCustomer,
+                    phone: e.target.value.replace(/\D/g, ""),
+                  })
                 }
-      onKeyDown={(e) => handleSuggestionKeyDown(e)}
-      autoComplete="off"
+                onKeyDown={(e) => handleSuggestionKeyDown(e)}
+                autoComplete="off"
               />
             </div>
             <div className="form-actions">
@@ -365,13 +367,14 @@ const filteredCustomers = customers.filter((c) => {
 
         {/* Customer List */}
         <div className="customer-list">
-         {filteredCustomers
-  .filter((c) => {
-    const hasName = !!c.name;
-    const hasPhone = !!c.phone || c.phone === 0;
-    const hasTransactions = Array.isArray(c.transactions) && c.transactions.length > 0;
-    return  hasPhone;
-  })
+          {filteredCustomers
+            .filter((c) => {
+              const hasName = !!c.name;
+              const hasPhone = !!c.phone || c.phone === 0;
+              const hasTransactions =
+                Array.isArray(c.transactions) && c.transactions.length > 0;
+              return hasPhone;
+            })
             .map((c) => {
               const owed = (c.youwillget || 0) - (c.youwillgave || 0);
 
@@ -514,7 +517,7 @@ const filteredCustomers = customers.filter((c) => {
 
                       {/* Contact Row */}
                       <div className="contact-row">
-                        {totalYouWillGet > 0  && (
+                        {totalYouWillGet > 0 && (
                           <>
                             <button
                               className="contact-btn whatsappp"
