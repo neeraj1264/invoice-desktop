@@ -50,7 +50,7 @@ export const CustomerData = () => {
       try {
         const ordersData = await fetchOrders(); // Fetch orders from API
         setOrders(ordersData);
-        await saveItems('orders', ordersData);
+        // await saveItems('orders', ordersData);
       } catch {
         const offline = await getAll('orders');
         setOrders(offline);
